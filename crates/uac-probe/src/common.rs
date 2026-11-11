@@ -22,17 +22,32 @@ const TOOLS: &[&str] = &[
 
 /// Ejecuta un comando y devuelve su salida estándar recortada si terminó bien.
 pub fn run(cmd: &str, args: &[&str]) -> Option<String> {
-    let out = Command::new(cmd)
+    let mut command = Command::new(cmd);
+    command
         .args(args)
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .ok()?;
+        .stderr(Stdio::null());
+    no_console_window(&mut command);
+    let out = command.output().ok()?;
     if !out.status.success() {
         return None;
     }
     let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
     (!text.is_empty()).then_some(text)
+}
+
+/// En Windows, evita que cada proceso hijo abra una ventana de consola. Hace
+/// falta cuando el programa que llama no tiene consola propia (el icono de
+/// bandeja): sin esto, cada sondeo haría parpadear una ventana de PowerShell.
+pub fn no_console_window(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    let _ = command;
 }
 
 pub fn read(path: impl AsRef<Path>) -> Option<String> {

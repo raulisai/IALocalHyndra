@@ -9,6 +9,7 @@
 //! pendientes de validar en esos nodos (tarea T0.2).
 
 mod common;
+pub use common::no_console_window;
 mod linux;
 mod macos;
 mod windows;

@@ -31,6 +31,17 @@ Estado: ☐ pendiente · ◐ en curso · ☑ hecho
 
 **Gate 0.5:** números medidos de repartido frente a un solo nodo.
 
+## Prototipo local (adelantado de las fases 1 y 2)
+
+| ID | Tarea | Aceptación | Estado |
+|---|---|---|---|
+| P.1 | `uac-node`: icono de bandeja en Windows + panel web en 127.0.0.1 | Arranca sin consola, abre el panel, un segundo arranque solo abre el panel | ☑ (menú de bandeja sin probar a mano) |
+| P.2 | Panel: hardware, GPU, red, llama.cpp, configuración persistente | Guarda en `%APPDATA%\uac\config.json` y valida la entrada | ☑ |
+| P.3 | Arrancar/detener `llama-server` con un modelo local y abrir su chat | qwen2.5 3B responde por `/v1/chat/completions` en la RX 6600 | ☑ |
+| P.4 | Arrancar/detener `ggml-rpc-server`; exponer en LAN solo con confirmación | Arranca en loopback; en IP de LAN exige `allow_lan` | ☑ |
+| P.5 | Mismo prototipo en macOS (bandeja) y Linux | — | ☐ |
+| P.6 | Arranque automático con Windows (opcional) | — | ☐ |
+
 ## Fase 1 — Clúster de jobs
 
 | ID | Tarea | Depende | Aceptación | Estado |

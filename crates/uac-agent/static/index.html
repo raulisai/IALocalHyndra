@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nodo UAC</title>
+<style>
+:root {
+  --bg: #f5f6f8; --card: #ffffff; --text: #1b1f24; --muted: #5d6673;
+  --line: #e1e4e8; --accent: #0f8f7e; --accent-text: #ffffff;
+  --ok: #1a7f37; --warn: #9a6700; --bad: #c4314b; --chip: #eef1f4;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418; --card: #1a1e24; --text: #e6e9ed; --muted: #9aa4b1;
+    --line: #2b313a; --accent: #2bb5a1; --accent-text: #08201c;
+    --ok: #4ac26b; --warn: #d4a72c; --bad: #f2667f; --chip: #242a32;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 16px 24px;
+  border-bottom: 1px solid var(--line); background: var(--card); flex-wrap: wrap; }
+header h1 { font-size: 18px; margin: 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+.muted { color: var(--muted); }
+main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px;
+  display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+section.wide { grid-column: 1 / -1; }
+h2 { font-size: 15px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
+dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--chip);
+  font-size: 12.5px; margin: 2px 4px 2px 0; }
+.chip.detected, .chip.verified, .chip.on { color: var(--ok); }
+.chip.expected, .chip.unknown { color: var(--warn); }
+.chip.unsupported, .chip.off { color: var(--bad); }
+.warn { color: var(--warn); } .bad { color: var(--bad); }
+button { font: inherit; border: 1px solid var(--line); background: var(--chip); color: var(--text);
+  border-radius: 7px; padding: 5px 12px; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+button:disabled { opacity: .5; cursor: default; }
+input, select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 8px; width: 100%; }
+label { display: block; margin-bottom: 10px; }
+label span { display: block; color: var(--muted); font-size: 13px; margin-bottom: 2px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 14px; }
+pre { font: 12px/1.45 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; margin: 8px 0 0; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td, th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+code { font-family: var(--mono); font-size: 13px; }
+#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text);
+  color: var(--bg); padding: 8px 14px; border-radius: 8px; display: none; max-width: 90vw; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1 id="title">Nodo UAC</h1>
+  <span class="muted" id="subtitle">cargando…</span>
+</header>
+
+<main>
+  <section>
+    <h2>Equipo <button id="reprobe">Volver a sondear</button></h2>
+    <dl id="machine"></dl>
+  </section>
+
+  <section>
+    <h2>GPU</h2>
+    <div id="gpus" class="muted">sondeando…</div>
+  </section>
+
+  <section>
+    <h2>Red</h2>
+    <div id="nics"></div>
+  </section>
+
+  <section>
+    <h2>llama.cpp</h2>
+    <dl id="llama"></dl>
+  </section>
+
+  <section class="wide">
+    <h2>Probar un modelo <span class="chip off" id="llm-state">detenido</span></h2>
+    <p class="muted" style="margin:0 0 8px">Arranca <code>llama-server</code> con un modelo local y abre su chat. Si hay nodos RPC configurados, reparte el modelo entre ellos.</p>
+    <div class="row">
+      <select id="model" style="flex:1; min-width:240px"></select>
+      <button class="primary" id="llm-start">Iniciar</button>
+      <button id="llm-stop">Detener</button>
+      <a id="chat-link" href="#" target="_blank" rel="noopener" style="display:none">Abrir chat ↗</a>
+    </div>
+    <div class="muted" id="llm-cmd" style="margin-top:6px"></div>
+    <pre id="llm-log" hidden></pre>
+  </section>
+
+  <section class="wide">
+    <h2>Prestar esta GPU por RPC <span class="chip off" id="rpc-state">detenido</span></h2>
+    <p class="muted" style="margin:0 0 8px">Arranca <code>ggml-rpc-server</code> para que otro nodo use esta GPU. No tiene autenticación: en una IP de red local, abre el puerto en el firewall solo para tus otros equipos.</p>
+    <div class="row">
+      <button class="primary" id="rpc-start">Iniciar</button>
+      <button id="rpc-stop">Detener</button>
+      <span class="muted" id="rpc-cmd"></span>
+    </div>
+    <pre id="rpc-log" hidden></pre>
+  </section>
+
+  <section class="wide">
+    <h2>Configuración <span class="muted" id="cfg-path" style="font-weight:normal;font-size:13px"></span></h2>
+    <form id="cfg">
+      <div class="grid2">
+        <label><span>Nombre del nodo (vacío = nombre del equipo)</span><input name="node_name"></label>
+        <label><span>Puerto del panel (requiere reiniciar)</span><input name="panel_port" type="number" min="1" max="65535"></label>
+        <label><span>Carpeta de llama.cpp (vacío = automática)</span><input name="llama_cpp_dir"></label>
+        <label><span>Carpetas de modelos (una por línea)</span><textarea name="model_dirs" rows="2" style="width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px"></textarea></label>
+        <label><span>Incluir modelos de Ollama</span><select name="include_ollama"><option value="true">Sí</option><option value="false">No</option></select></label>
+      </div>
+      <h2 style="margin-top:8px">llama-server</h2>
+      <div class="grid2">
+        <label><span>Puerto</span><input name="llm.port" type="number" min="1" max="65535"></label>
+        <label><span>Capas en GPU (-ngl)</span><input name="llm.gpu_layers" type="number" min="0"></label>
+        <label><span>Contexto (tokens)</span><input name="llm.ctx_size" type="number" min="256"></label>
+        <label><span>Nodos RPC para repartir (ip:puerto, separados por comas)</span><input name="llm.rpc_peers" placeholder="192.168.1.20:50052"></label>
+      </div>
+      <h2 style="margin-top:8px">Servidor RPC</h2>
+      <div class="grid2">
+        <label><span>IP de escucha (127.0.0.1 = solo este equipo)</span><input name="rpc.bind"></label>
+        <label><span>Puerto</span><input name="rpc.port" type="number" min="1" max="65535"></label>
+        <label><span>Dispositivo (vacío = todos; p. ej. Vulkan0)</span><input name="rpc.device"></label>
+        <label><span>Caché local de tensores (-c)</span><select name="rpc.cache"><option value="true">Sí</option><option value="false">No</option></select></label>
+      </div>
+      <div class="row"><button class="primary" type="submit">Guardar</button><span class="muted" id="cfg-msg"></span></div>
+    </form>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const gib = (b) => b == null ? "?" : (b / 2 ** 30).toFixed(1) + " GiB";
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let last = null, editing = false, modelsLoaded = false;
+
+function toast(msg, ms = 3500) {
+  const t = $("toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.style.display = "none"), ms);
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: { "X-UAC-Panel": "1" } };
+  if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function fmtUptime(s) {
+  if (s == null) return "";
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h} h ${m} min` : m ? `${m} min` : `${s} s`;
+}
+
+function render(s) {
+  last = s;
+  $("title").textContent = s.node_name ? `Nodo ${s.node_name}` : "Nodo UAC";
+  $("subtitle").textContent = `activo · ${fmtUptime(s.uptime_secs)} · v${s.version}`;
+  $("dot").style.background = "var(--ok)";
+  const r = s.report;
+
+  $("machine").innerHTML = r ? `
+    <dt>Equipo</dt><dd>${esc(r.hostname)}</dd>
+    <dt>Sistema</dt><dd>${esc(r.os.version || r.os.family)} · ${esc(r.os.arch)}</dd>
+    <dt>CPU</dt><dd>${esc(r.cpu.model || "?")}${r.cpu.physical_cores ? ` · ${r.cpu.physical_cores} núcleos / ${r.cpu.logical_cores} hilos` : ""}</dd>
+    <dt>RAM</dt><dd>${gib(r.ram_bytes)}</dd>
+    ${r.warnings.map((w) => `<dt class="warn">Aviso</dt><dd class="warn">${esc(w)}</dd>`).join("")}
+  ` : `<dt>Estado</dt><dd>sondeando el hardware…</dd>`;
+
+  $("gpus").innerHTML = !r ? "sondeando…" : r.gpus.length ? r.gpus.map((g) => `
+    <div style="margin-bottom:10px">
+      <strong>${esc(g.name)}</strong> <span class="muted">· ${gib(g.vram_bytes)} · ${g.memory_kind === "shared" ? "integrada (no se usa)" : g.memory_kind === "unified" ? "memoria unificada" : "VRAM dedicada"}</span><br>
+      ${g.backends.map((b) => `<span class="chip ${b.status}" title="${esc(b.note || "")}">${b.backend}: ${b.status}</span>`).join("")}
+    </div>`).join("") + `<div class="muted" style="font-size:13px">«detected» = driver presente. Ningún backend pasa a «verified» sin un benchmark.</div>`
+    : `<span class="bad">No se detectó ninguna GPU.</span>`;
+
+  $("nics").innerHTML = !r ? "" : `<table>${r.nics.map((n) => `
+    <tr><td>${esc(n.name)}${n.is_virtual ? ' <span class="muted">(virtual)</span>' : ""}</td>
+    <td class="num">${n.link_bps ? (n.link_bps / 1e6).toFixed(0) + " Mb/s" : "?"}</td></tr>`).join("")}</table>
+    ${r.nics.some((n) => !n.is_virtual && /wi-?fi|wireless|wlan/i.test(n.name + (n.description || ""))) && !r.nics.some((n) => !n.is_virtual && !/wi-?fi|wireless|wlan/i.test(n.name + (n.description || "")))
+      ? '<p class="warn" style="margin:8px 0 0">Solo hay Wi-Fi. Para repartir modelos entre equipos conviene Ethernet.</p>' : ""}`;
+
+  const tools = s.llama.tools || {};
+  $("llama").innerHTML = s.llama.dir ? `
+    <dt>Carpeta</dt><dd><code>${esc(s.llama.dir)}</code></dd>
+    <dt>Programas</dt><dd>${Object.entries(tools).map(([k, v]) => `<span class="chip ${v ? "on" : "off"}">${k}</span>`).join("")}</dd>`
+    : `<dt>Estado</dt><dd class="bad">No encontrado. Descarga el build fijado (ver docs/llama-cpp.md) en <code>tools/llama.cpp/</code> o indica la carpeta en la configuración.</dd>`;
+
+  renderProc("llm", s.llm);
+  renderProc("rpc", s.rpc);
+  const chat = $("chat-link");
+  chat.href = `http://127.0.0.1:${s.config.llm.port}/`;
+  chat.style.display = s.llm.running ? "" : "none";
+  $("cfg-path").textContent = s.config_path;
+  if (!editing) fillForm(s.config);
+  if (s.config_warning) $("cfg-msg").textContent = s.config_warning;
+}
+
+function renderProc(kind, p) {
+  const st = $(`${kind}-state`);
+  st.textContent = p.running ? `en marcha · PID ${p.pid} · ${fmtUptime(p.uptime_secs)}` : p.last_exit ? `detenido · ${p.last_exit}` : "detenido";
+  st.className = "chip " + (p.running ? "on" : "off");
+  $(`${kind}-start`).disabled = p.running || !last?.llama?.dir;
+  $(`${kind}-stop`).disabled = !p.running;
+  $(`${kind}-cmd`).textContent = p.command_line ? `$ ${p.command_line}` : "";
+  const log = $(`${kind}-log`);
+  log.hidden = !p.log.length;
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+  log.textContent = p.log.join("\n");
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+function fillForm(c) {
+  const f = $("cfg");
+  f.node_name.value = c.node_name;
+  f.panel_port.value = c.panel_port;
+  f.llama_cpp_dir.value = c.llama_cpp_dir || "";
+  f.model_dirs.value = c.model_dirs.join("\n");
+  f.include_ollama.value = String(c.include_ollama);
+  f["llm.port"].value = c.llm.port;
+  f["llm.gpu_layers"].value = c.llm.gpu_layers;
+  f["llm.ctx_size"].value = c.llm.ctx_size;
+  f["llm.rpc_peers"].value = c.llm.rpc_peers.join(", ");
+  f["rpc.bind"].value = c.rpc.bind;
+  f["rpc.port"].value = c.rpc.port;
+  f["rpc.device"].value = c.rpc.device;
+  f["rpc.cache"].value = String(c.rpc.cache);
+}
+
+function readForm() {
+  const f = $("cfg"), list = (v, sep) => v.split(sep).map((x) => x.trim()).filter(Boolean);
+  return {
+    node_name: f.node_name.value.trim(),
+    panel_port: +f.panel_port.value,
+    llama_cpp_dir: f.llama_cpp_dir.value.trim() || null,
+    model_dirs: list(f.model_dirs.value, /\r?\n/),
+    include_ollama: f.include_ollama.value === "true",
+    llm: { port: +f["llm.port"].value, gpu_layers: +f["llm.gpu_layers"].value, ctx_size: +f["llm.ctx_size"].value, rpc_peers: list(f["llm.rpc_peers"].value, ",") },
+    rpc: { bind: f["rpc.bind"].value.trim(), port: +f["rpc.port"].value, device: f["rpc.device"].value.trim(), cache: f["rpc.cache"].value === "true" },
+  };
+}
+
+async function loadModels() {
+  const sel = $("model"), prev = sel.value;
+  try {
+    const models = await api("GET", "/api/models");
+    sel.innerHTML = models.length
+      ? models.map((m) => `<option value="${esc(m.path)}">${esc(m.name)} — ${gib(m.size_bytes)}${m.source === "ollama" ? " (Ollama)" : ""}</option>`).join("")
+      : '<option value="">No se encontraron modelos .gguf</option>';
+    if (prev) sel.value = prev;
+    modelsLoaded = true;
+  } catch (e) { toast("Modelos: " + e.message); }
+}
+
+async function refresh() {
+  try { render(await api("GET", "/api/status")); }
+  catch (e) { $("dot").style.background = "var(--bad)"; $("subtitle").textContent = "sin conexión con el nodo"; }
+}
+
+async function act(btn, fn) {
+  btn.disabled = true;
+  try { await fn(); } catch (e) { toast(e.message, 6000); } finally { await refresh(); }
+}
+
+$("reprobe").onclick = (e) => act(e.target, async () => { await api("POST", "/api/probe"); toast("Hardware sondeado de nuevo"); });
+$("llm-start").onclick = (e) => act(e.target, async () => {
+  const model_path = $("model").value;
+  if (!model_path) throw new Error("Elige un modelo");
+  await api("POST", "/api/llm/start", { model_path });
+  toast("Cargando el modelo… el chat estará listo cuando el log diga «server is listening»", 6000);
+});
+$("llm-stop").onclick = (e) => act(e.target, () => api("POST", "/api/llm/stop"));
+$("rpc-start").onclick = (e) => act(e.target, async () => {
+  const lan = last && !["127.0.0.1", "::1"].includes(last.config.rpc.bind);
+  if (lan && !confirm(`El servidor RPC escuchará en ${last.config.rpc.bind} sin autenticación. Cualquiera en tu red podría usar esta GPU. ¿Continuar?`)) return;
+  await api("POST", "/api/rpc/start", { allow_lan: !!lan });
+});
+$("rpc-stop").onclick = (e) => act(e.target, () => api("POST", "/api/rpc/stop"));
+
+const form = $("cfg");
+form.addEventListener("focusin", () => (editing = true));
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api("PUT", "/api/config", readForm());
+    $("cfg-msg").textContent = r.restart_needed ? "Guardado. Reinicia el programa para cambiar el puerto del panel." : "Guardado.";
+    editing = false; modelsLoaded = false; await loadModels();
+  } catch (err) { $("cfg-msg").textContent = ""; toast(err.message, 6000); }
+  refresh();
+});
+
+refresh().then(loadModels);
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

@@ -1,26 +1,65 @@
+# --- Compilación ---
 /target
 **/*.rs.bk
+*.pdb
 
-# Modelos y pesos: nunca al repo
+# --- Binarios de terceros descargados (llama.cpp, etc.) ---
+/tools/
+*.exe
+*.dll
+*.so
+*.dylib
+*.zip
+*.tar.gz
+*.7z
+
+# --- Modelos, pesos y datasets: nunca al repo ---
+/models/
 *.gguf
 *.safetensors
 *.ckpt
 *.pt
+*.pth
 *.bin
-/models/
+*.onnx
+*.h5
+*.npz
+*.mlpackage/
+*.burnpack
+*.mpk
 
-# Binarios de terceros descargados (llama.cpp, etc.)
-/tools/
-
-# Python
-.venv/
-__pycache__/
-
-# Node
-node_modules/
-
-# Secretos y estado local
-.env
+# --- Datos propios de cada máquina ---
+# Los informes del probe incluyen nombre del equipo y rutas del usuario.
+# Se versiona solo el ejemplo anonimizado.
+/docs/hardware/*.json
+!/docs/hardware/example-*.json
+/data/
 *.sqlite
 *.sqlite-*
-/data/
+*.db
+*.log
+/logs/
+
+# --- Secretos y configuración local ---
+.env
+.env.*
+*.pem
+*.key
+.claude/settings.local.json
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# --- Node ---
+node_modules/
+
+# --- Editores y sistema operativo ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

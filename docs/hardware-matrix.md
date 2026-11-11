@@ -1,12 +1,12 @@
 # Matriz de hardware
 
-Fuente: `uac-agent probe`. Un JSON por nodo en [hardware/](hardware/). Es un inventario, no una prueba de cómputo: ningún backend pasa a `verified` hasta que un benchmark calcule tensores (T0.6).
+Fuente: `uac-agent probe`. Un JSON por nodo en `docs/hardware/`, que **no se versiona** (incluye nombre del equipo y rutas del usuario). Esta tabla es el resumen que sí se comparte. Es un inventario, no una prueba de cómputo: ningún backend pasa a `verified` hasta que un benchmark calcule tensores (T0.6).
 
 ## Nodos
 
 | | AMD (este) | RTX | MAC |
 |---|---|---|---|
-| Informe | [amd-rx6600.json](hardware/amd-rx6600.json) | pendiente (T0.2) | pendiente (T0.2) |
+| Informe (local) | `amd-rx6600.json` | pendiente (T0.2) | pendiente (T0.2) |
 | SO | Windows 11 Pro 10.0.26300 | ? | ? |
 | CPU | Ryzen 5 3400G, 4 núcleos / 8 hilos | ? | Apple M4 |
 | RAM | 31,9 GiB | ? | ? |
