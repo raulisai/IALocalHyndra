@@ -1,0 +1,26 @@
+/target
+**/*.rs.bk
+
+# Modelos y pesos: nunca al repo
+*.gguf
+*.safetensors
+*.ckpt
+*.pt
+*.bin
+/models/
+
+# Binarios de terceros descargados (llama.cpp, etc.)
+/tools/
+
+# Python
+.venv/
+__pycache__/
+
+# Node
+node_modules/
+
+# Secretos y estado local
+.env
+*.sqlite
+*.sqlite-*
+/data/

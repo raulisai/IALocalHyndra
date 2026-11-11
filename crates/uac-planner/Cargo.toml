@@ -1,0 +1,10 @@
+[package]
+name = "uac-planner"
+description = "Presupuestos de memoria, ubicación de cargas y coste de red"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+uac-protocol.workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "uac-probe"
+description = "Inventario de hardware, SO y red de un nodo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+uac-protocol.workspace = true
