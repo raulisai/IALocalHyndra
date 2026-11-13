@@ -34,7 +34,8 @@ Desde el panel se puede:
 
 - **Ejecutar un modelo.** Eliges un GGUF local (carpetas configuradas o biblioteca de Ollama) y el panel dice si cabe en esta GPU, si habrá que repartirlo o si no cabe. Al iniciarlo aparece un chat; su API es compatible con OpenAI en `http://127.0.0.1:8080/v1`.
 - **Compartir mi GPU.** Deja que otro equipo de la red la use. Se elige por qué conexión: cable o Wi-Fi.
-- **Usar la GPU de otro equipo.** Botón «Usar su GPU» en su nodo del mapa. Un modelo solo se reparte cuando no cabe en esta GPU, y solo con los equipos que responden en ese momento.
+- **Unir la memoria del clúster con un solo botón.** Si el modelo elegido no cabe en esta GPU pero sí uniendo la de otros equipos, aparece «Iniciar uniendo la memoria del clúster». El programa elige por sí solo los equipos mínimos necesarios (los de más memoria primero, porque cada salto de red cuesta velocidad), comprueba que responden y arranca el modelo repartido. Para que un equipo entre, tiene que estar compartiendo su GPU: o pulsando «Compartir mi GPU» en su panel, o con la casilla «Compartir mi GPU sola al abrir el programa», que lo deja listo para siempre (usa el cable si hay uno).
+- **Elegir a mano.** «Usar su GPU» en el nodo de un equipo lo reserva para el siguiente modelo que no quepa. Un modelo que cabe en esta GPU nunca se reparte.
 - **Compartir el chat con otros equipos.** Casilla «Permitir que otros equipos de mi red usen este chat»: el modelo se abre por la conexión que elijas y se protege con una clave aleatoria que ves en el panel. En el otro equipo, el nodo de este aparece con «Abrir su chat»; pide la clave una vez y la recuerda.
 - **Añadir un equipo por su IP**, para uno que solo tenga el servidor RPC de llama.cpp.
 - **Cambiar la configuración**, que se guarda en `%APPDATA%\uac\config.json`.
@@ -51,7 +52,9 @@ Si no se ven, lo primero que hay que mirar es el firewall: Windows trata un cabl
 
 ### Seguridad
 
-El panel solo escucha en `127.0.0.1`. El chat también, salvo que marques compartirlo: entonces escucha en la IP de red elegida y exige la clave en cada petición (sin clave o con una incorrecta responde 401). La clave no viaja en el anuncio de la red: se la das tú a quien quieras. Quien la tenga puede usar el modelo y tu GPU mientras esté en marcha; «Generar clave nueva» la invalida. Compartir la GPU por RPC, en cambio, no tiene contraseña: mientras esté activo, cualquiera en esa red puede usarla. Solo se aceptan direcciones de red local. Los errores quedan en `%APPDATA%\uac\uac-node.log`.
+El panel solo escucha en `127.0.0.1`. El chat también, salvo que marques compartirlo: entonces escucha en la IP de red elegida y exige la clave en cada petición (sin clave o con una incorrecta responde 401). La clave no viaja en el anuncio de la red: se la das tú a quien quieras. Quien la tenga puede usar el modelo y tu GPU mientras esté en marcha; «Generar clave nueva» la invalida. Compartir la GPU por RPC, en cambio, no tiene contraseña: mientras esté activo, cualquiera en esa red puede usarla. Por eso la casilla de compartir automáticamente pide confirmación y se recomienda limitar el puerto en el firewall a las IP de tus otros equipos (ver [docs/hardware-matrix.md](docs/hardware-matrix.md)).
+
+**Disco.** Un equipo que presta su GPU guarda en disco una caché de los pesos que recibe (`%LOCALAPPDATA%\llama.cpp\rpc`), del tamaño del modelo. Si le queda poco espacio, pon `"cache": false` en la sección `rpc` de su `config.json`: es más lento al repetir, pero no llena el disco. Solo se aceptan direcciones de red local. Los errores quedan en `%APPDATA%\uac\uac-node.log`.
 
 Para ver la salida en una consola mientras se desarrolla, usa el build de depuración: `cargo run -p uac-agent --bin uac-node`. Para probar dos nodos en un mismo equipo, arranca el segundo con la variable `UAC_CONFIG_DIR` apuntando a otra carpeta (con otro `panel_port` en su `config.json`) y con `UAC_ADVERTISE_LOOPBACK=1`.
 

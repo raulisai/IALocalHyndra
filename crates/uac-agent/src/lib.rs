@@ -107,6 +107,23 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
     };
     listener.set_nonblocking(true)?;
 
+    // Con «compartir GPU automáticamente» se escucha por la mejor conexión de
+    // red (cable antes que Wi-Fi). Solo en memoria: la IP puede cambiar entre
+    // un arranque y otro, así que no se guarda como elección del usuario.
+    let mut cfg = cfg;
+    let mut auto_share = false;
+    if cfg.rpc.auto {
+        match discovery::preferred_lan_ip(&discovery::local_ipv4()) {
+            Some(ip) => {
+                cfg.rpc.bind = ip.to_string();
+                auto_share = true;
+            }
+            None => {
+                log_line("compartir GPU automáticamente: no hay conexión de red; no se comparte")
+            }
+        }
+    }
+
     let hostname = hostname();
     let state = Arc::new(AppState {
         node_id: discovery::node_id(&hostname, cfg.panel_port),
@@ -114,6 +131,7 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
         discovery: Discovery::default(),
         llm_model: RwLock::new(None),
         llm_share: RwLock::new(None),
+        llm_prev_peers: RwLock::new(None),
         llm_split: std::sync::atomic::AtomicBool::new(false),
         config: RwLock::new(cfg),
         config_path,
@@ -123,6 +141,26 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
         started: Instant::now(),
         panel_url: url.clone(),
     });
+
+    if auto_share {
+        let cfg = state.config.read().map(|c| c.clone()).unwrap_or_default();
+        match config::resolve_llama_dir(&cfg) {
+            Some(dir) => {
+                let exe = dir.join(config::exe_name("ggml-rpc-server"));
+                match state
+                    .procs
+                    .start(procs::Kind::Rpc, &exe, &web::rpc_args(&cfg), &[])
+                {
+                    Ok(()) => log_line(&format!(
+                        "GPU compartida automáticamente en {}:{}",
+                        cfg.rpc.bind, cfg.rpc.port
+                    )),
+                    Err(err) => log_line(&format!("no se pudo compartir la GPU: {err:#}")),
+                }
+            }
+            None => log_line("compartir GPU automáticamente: no se encontró llama.cpp"),
+        }
+    }
 
     // El sondeo tarda un par de segundos: se hace en segundo plano y el panel
     // muestra «sondeando…» mientras tanto.

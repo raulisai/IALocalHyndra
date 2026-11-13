@@ -40,6 +40,10 @@ pub struct RpcConfig {
     pub device: String,
     /// Caché local de tensores (`-c`): evita reenviar pesos.
     pub cache: bool,
+    /// Compartir la GPU sola al abrir el programa, por la conexión de red
+    /// preferida (cable antes que Wi-Fi). Es lo que permite unir la memoria
+    /// del clúster con una sola petición desde otro equipo.
+    pub auto: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -84,6 +88,7 @@ impl Default for RpcConfig {
             port: 50052,
             device: String::new(),
             cache: true,
+            auto: false,
         }
     }
 }

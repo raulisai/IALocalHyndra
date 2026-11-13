@@ -1,4 +1,4 @@
-﻿# Backlog de desarrollo
+# Backlog de desarrollo
 
 Tareas ordenadas por fase. Cada una tiene un criterio de aceptación comprobable. Contexto y motivos en [arquitectura-v2.md](arquitectura-v2.md).
 
@@ -43,6 +43,8 @@ Estado: ☐ pendiente · ◐ en curso · ☑ hecho
 | P.7 | Descubrimiento automático de equipos por mDNS ([ADR 0006](adr/0006-descubrimiento-mdns.md)) | Dos instancias se ven en ambos sentidos; una caída sin aviso se detecta en ~10 s | ☑ en un solo equipo; ☐ entre dos equipos físicos |
 | P.8 | Mapa del clúster en el panel, actividad y avisos | Estados y latencia visibles; aviso al conectarse o desconectarse un equipo | ☑ (notificaciones de Windows sin confirmar a la vista) |
 | P.9 | «Usar su GPU»: repartir un modelo con un equipo descubierto | `llama-server` responde con `--rpc` hacia otra instancia | ◐ validado en loopback sobre la misma GPU; ☐ con dos GPU reales |
+| P.11 | Unir la memoria con una petición: elegir los equipos mínimos, comprobarlos y repartir | `use_cluster` elige solo los necesarios y arma `--rpc`; error claro si no cabe ni con todos | ☑ elección y arranque con tres nodos; ☐ carga real de un modelo repartido entre dos GPU físicas |
+| P.12 | Compartir la GPU sola al abrir el programa (opt-in) | Un nodo con `rpc.auto` se anuncia con RPC sin tocar su panel | ☑ |
 | P.10 | Usar el chat de un equipo desde otro (compartir en la LAN con clave) | Sin clave 401; con clave responde; el otro equipo ve el chat anunciado | ☑ por la IP de red de este equipo y en el navegador; ☐ entre dos equipos físicos |
 | P.6 | Arranque automático con Windows (opcional) | — | ☐ |
 
