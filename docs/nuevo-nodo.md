@@ -2,18 +2,16 @@
 
 Guía para llevar el proyecto a otro equipo (Mac M4 o PC con RTX) y completar T0.2, T0.7 y T0.8.
 
-## 1. Llevar el repositorio
-
-El repo no tiene remoto. En el equipo de origen se genera un paquete con todo el historial:
+## 1. Obtener el repositorio
 
 ```bash
-git bundle create uac.bundle --all
+git clone https://github.com/raulisai/IALocalHyndra.git
 ```
 
-Se copia `uac.bundle` al otro equipo (USB, red local) y allí:
+Para actualizar un equipo que ya lo tiene:
 
 ```bash
-git clone uac.bundle universal-ai-cluster
+git pull
 ```
 
 ## 2. Requisitos
