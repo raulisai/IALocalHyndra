@@ -40,6 +40,10 @@ Estado: ☐ pendiente · ◐ en curso · ☑ hecho
 | P.3 | Arrancar/detener `llama-server` con un modelo local y abrir su chat | qwen2.5 3B responde por `/v1/chat/completions` en la RX 6600 | ☑ |
 | P.4 | Arrancar/detener `ggml-rpc-server`; exponer en LAN solo con confirmación | Arranca en loopback; en IP de LAN exige `allow_lan` | ☑ |
 | P.5 | Mismo prototipo en macOS (bandeja) y Linux | — | ☐ |
+| P.7 | Descubrimiento automático de equipos por mDNS ([ADR 0006](adr/0006-descubrimiento-mdns.md)) | Dos instancias se ven en ambos sentidos; una caída sin aviso se detecta en ~10 s | ☑ en un solo equipo; ☐ entre dos equipos físicos |
+| P.8 | Mapa del clúster en el panel, actividad y avisos | Estados y latencia visibles; aviso al conectarse o desconectarse un equipo | ☑ (notificaciones de Windows sin confirmar a la vista) |
+| P.9 | «Usar su GPU»: repartir un modelo con un equipo descubierto | `llama-server` responde con `--rpc` hacia otra instancia | ◐ validado en loopback sobre la misma GPU; ☐ con dos GPU reales |
+| P.10 | Usar el chat de un equipo desde otro (compartir en la LAN con clave) | — | ☐ |
 | P.6 | Arranque automático con Windows (opcional) | — | ☐ |
 
 ## Fase 1 — Clúster de jobs

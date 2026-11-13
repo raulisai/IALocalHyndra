@@ -178,9 +178,7 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
                     n => format!("{n} equipos conectados"),
                 };
                 format!(
-                    "Universal AI Cluster: activo
-{peers}
-{url}"
+                    "Universal AI Cluster: activo\n{peers}\n{url}"
                 )
             }
         };

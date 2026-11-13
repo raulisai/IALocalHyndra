@@ -28,16 +28,31 @@ Después ejecuta `target\release\uac-node.exe` (doble clic sirve). Aparece un ic
 - **Clic derecho**: menú con «Abrir panel» y «Salir». Salir detiene también los servidores de llama.cpp que haya arrancado.
 - Si el programa ya está abierto, volver a ejecutarlo solo abre el panel.
 
+El panel muestra **un mapa del clúster**: este equipo y los demás que encuentre en la red, cada uno unido a este por una línea que indica su estado (GPU disponible, lista para usar, en uso, desconectado) y la latencia. Los equipos aparecen solos, sin escribir direcciones, y Windows avisa con una notificación cuando uno se conecta o se desconecta.
+
 Desde el panel se puede:
 
-- ver el hardware del equipo, las GPU y sus backends, la red y la carpeta de llama.cpp;
-- elegir un modelo GGUF local (carpetas configuradas y biblioteca de Ollama), arrancar `llama-server` y abrir su chat; su API es compatible con OpenAI en `http://127.0.0.1:8080/v1`;
-- arrancar `ggml-rpc-server` para prestar la GPU a otro nodo;
-- cambiar la configuración, que se guarda en `%APPDATA%\uac\config.json`.
+- **Ejecutar un modelo.** Eliges un GGUF local (carpetas configuradas o biblioteca de Ollama) y el panel dice si cabe en esta GPU, si habrá que repartirlo o si no cabe. Al iniciarlo aparece un chat; su API es compatible con OpenAI en `http://127.0.0.1:8080/v1`.
+- **Compartir mi GPU.** Deja que otro equipo de la red la use. Se elige por qué conexión: cable o Wi-Fi.
+- **Usar la GPU de otro equipo.** Botón «Usar su GPU» en su nodo del mapa. Un modelo solo se reparte cuando no cabe en esta GPU, y solo con los equipos que responden en ese momento.
+- **Añadir un equipo por su IP**, para uno que solo tenga el servidor RPC de llama.cpp.
+- **Cambiar la configuración**, que se guarda en `%APPDATA%\uac\config.json`.
 
-El panel y `llama-server` solo escuchan en `127.0.0.1`. El servidor RPC también, salvo que se cambie su IP en la configuración y se confirme el aviso. Los errores quedan en `%APPDATA%\uac\uac-node.log`.
+### Dos equipos unidos por un cable Ethernet
 
-Para ver la salida en una consola mientras se desarrolla, usa el build de depuración: `cargo run -p uac-agent --bin uac-node`.
+Se puede unir el PC y la laptop con un cable de red normal, sin router. Cada equipo se asigna solo una dirección `169.254.x.x` (tarda hasta un minuto) y el Wi-Fi sigue dando Internet. Después:
+
+1. Abre el programa en los dos equipos. Deben verse en el mapa.
+2. En el equipo que presta su GPU: «Compartir mi GPU», eligiendo la conexión marcada como cable.
+3. En el otro: «Usar su GPU», y luego inicia un modelo que no quepa en una sola GPU.
+
+Si no se ven, lo primero que hay que mirar es el firewall: Windows trata un cable directo como red pública y puede bloquear el programa. Permítelo cuando pregunte.
+
+### Seguridad
+
+El panel y el chat solo escuchan en `127.0.0.1`: **el chat todavía no se puede abrir desde otro equipo**. Compartir la GPU no tiene contraseña: mientras esté activo, cualquiera en esa red puede usarla. Solo se aceptan direcciones de red local. Los errores quedan en `%APPDATA%\uac\uac-node.log`.
+
+Para ver la salida en una consola mientras se desarrolla, usa el build de depuración: `cargo run -p uac-agent --bin uac-node`. Para probar dos nodos en un mismo equipo, arranca el segundo con la variable `UAC_CONFIG_DIR` apuntando a otra carpeta (con otro `panel_port` en su `config.json`) y con `UAC_ADVERTISE_LOOPBACK=1`.
 
 ## Estado
 
@@ -59,7 +74,7 @@ cargo run -p uac-controller -- plan --required-gb 12
 
 Los informes de `probe` se quedan en local (están en `.gitignore`): contienen el nombre del equipo y rutas del usuario.
 
-Todavía no hay red entre nodos gestionada por el programa, colas ni jobs: empiezan en la Fase 1. Para repartir un modelo entre equipos hoy, arranca el servidor RPC en un nodo y escribe su `ip:puerto` en «Nodos RPC para repartir» del otro.
+Todavía no hay colas ni jobs, ni se puede usar el chat desde otro equipo: eso empieza en la Fase 1.
 
 ## Estructura
 

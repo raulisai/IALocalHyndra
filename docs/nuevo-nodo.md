@@ -72,6 +72,10 @@ cargo run -p uac-agent --bin uac-node
 
 Abre `http://127.0.0.1:47800/`. El icono de bandeja solo existe en Windows; en Mac y Linux el programa corre sin icono y se sale con Ctrl+C. **El panel no se ha probado fuera de Windows.**
 
+Con el programa abierto en dos equipos de la misma red, cada uno debe aparecer en el mapa del otro en unos segundos. Eso todavía no se ha comprobado entre dos equipos físicos: si no se ven, revisa primero el firewall (mDNS usa UDP 5353) y anota el resultado.
+
+Con un cable Ethernet directo entre los dos no hace falta configurar nada: cada equipo se asigna una dirección `169.254.x.x`. Windows clasifica esa red como pública, así que hay que permitir el programa en el firewall cuando pregunte. Desde el panel, el flujo es «Compartir mi GPU» en un equipo y «Usar su GPU» en el otro.
+
 ## 6. Prueba RPC entre equipos (T0.8)
 
 Necesitas la IP de LAN de cada equipo y ambos en la misma red.
