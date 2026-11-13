@@ -2,6 +2,8 @@
 //!
 //! Clic izquierdo o doble clic: abre el panel. Clic derecho: menú.
 
+use std::time::{Duration, Instant};
+
 use tao::event::{Event, StartCause};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
@@ -12,9 +14,17 @@ enum UserEvent {
     Menu(MenuEvent),
 }
 
+/// Cada cuánto se refresca el texto que aparece al pasar el ratón por el icono.
+const TOOLTIP_REFRESH: Duration = Duration::from_secs(3);
+
 /// Bloquea el hilo principal con el bucle de mensajes de Windows.
+/// `tooltip` se consulta periódicamente para reflejar el estado del clúster.
 /// `on_quit` se ejecuta una vez al elegir «Salir».
-pub fn run(url: String, tooltip: String, on_quit: impl FnOnce() + 'static) -> ! {
+pub fn run(
+    url: String,
+    tooltip: impl Fn() -> String + 'static,
+    on_quit: impl FnOnce() + 'static,
+) -> ! {
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
 
     let proxy = event_loop.create_proxy();
@@ -37,17 +47,25 @@ pub fn run(url: String, tooltip: String, on_quit: impl FnOnce() + 'static) -> ! 
         &quit_item,
     ]);
 
-    let mut tray = None;
+    let mut tray: Option<tray_icon::TrayIcon> = None;
     let mut on_quit = Some(on_quit);
+    let mut shown_tooltip = tooltip();
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::WaitUntil(Instant::now() + TOOLTIP_REFRESH);
+        if let Some(icon) = &tray {
+            let current = tooltip();
+            if current != shown_tooltip {
+                let _ = icon.set_tooltip(Some(&current));
+                shown_tooltip = current;
+            }
+        }
         match event {
             Event::NewEvents(StartCause::Init) => {
                 let built = TrayIconBuilder::new()
                     .with_menu(Box::new(menu.clone()))
                     .with_menu_on_left_click(false)
-                    .with_tooltip(&tooltip)
+                    .with_tooltip(&shown_tooltip)
                     .with_icon(icon())
                     .build();
                 match built {

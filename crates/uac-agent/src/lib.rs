@@ -1,6 +1,7 @@
 //! Agente de nodo: panel web local, icono de bandeja y procesos de llama.cpp.
 
 pub mod config;
+pub mod discovery;
 pub mod models;
 pub mod procs;
 #[cfg(windows)]
@@ -14,6 +15,7 @@ use std::time::Instant;
 
 use anyhow::Context;
 
+use crate::discovery::Discovery;
 use crate::procs::Procs;
 use crate::web::AppState;
 
@@ -58,6 +60,27 @@ pub fn log_line(msg: &str) {
     }
 }
 
+/// Aviso del sistema (notificación de Windows). En otros sistemas no hace nada
+/// todavía.
+pub fn notify(title: &str, body: &str) {
+    #[cfg(windows)]
+    if let Err(err) = notify_rust::Notification::new()
+        .summary(title)
+        .body(body)
+        .show()
+    {
+        log_line(&format!("no se pudo mostrar la notificación: {err}"));
+    }
+    #[cfg(not(windows))]
+    let _ = (title, body);
+}
+
+fn hostname() -> String {
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "nodo".to_string())
+}
+
 pub struct Options {
     pub open_browser: bool,
 }
@@ -84,7 +107,13 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
     };
     listener.set_nonblocking(true)?;
 
+    let hostname = hostname();
     let state = Arc::new(AppState {
+        node_id: discovery::node_id(&hostname, cfg.panel_port),
+        hostname,
+        discovery: Discovery::default(),
+        llm_model: RwLock::new(None),
+        llm_split: std::sync::atomic::AtomicBool::new(false),
         config: RwLock::new(cfg),
         config_path,
         config_warning,
@@ -105,6 +134,14 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
             }
         });
     }
+
+    // Anuncio y búsqueda de otros nodos en la red local.
+    let discovery_thread = {
+        let state = state.clone();
+        std::thread::spawn(move || {
+            discovery::run(&state.discovery, || state.discovery_context());
+        })
+    };
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
     let server_state = state.clone();
@@ -131,8 +168,26 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
 
     #[cfg(windows)]
     {
-        let tooltip = format!("Universal AI Cluster: activo\n{url}");
+        let tooltip = {
+            let state = state.clone();
+            let url = url.clone();
+            move || {
+                let peers = match state.discovery.online_count() {
+                    0 => "Sin otros equipos conectados".to_string(),
+                    1 => "1 equipo conectado".to_string(),
+                    n => format!("{n} equipos conectados"),
+                };
+                format!(
+                    "Universal AI Cluster: activo
+{peers}
+{url}"
+                )
+            }
+        };
         tray::run(url, tooltip, move || {
+            // Primero la despedida en la red, para que los demás lo vean al instante.
+            state.discovery.shutdown();
+            let _ = discovery_thread.join();
             state.procs.stop_all();
             let _ = shutdown_tx.send(());
             let _ = server.join();
@@ -145,6 +200,7 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
         // Sin icono de bandeja fuera de Windows por ahora: el proceso vive
         // mientras viva el servidor (Ctrl+C para salir).
         let _ = shutdown_tx;
+        let _ = discovery_thread;
         let result = server
             .join()
             .map_err(|_| anyhow::anyhow!("el servidor terminó con pánico"))?;

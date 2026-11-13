@@ -22,6 +22,10 @@ pub struct Config {
     pub model_dirs: Vec<PathBuf>,
     /// Incluir los modelos descargados con Ollama.
     pub include_ollama: bool,
+    /// Anunciarse y buscar otros nodos en la red local (mDNS). Requiere reiniciar.
+    pub discovery: bool,
+    /// Avisos del sistema cuando un equipo se conecta o desconecta.
+    pub notifications: bool,
     pub rpc: RpcConfig,
     pub llm: LlmConfig,
 }
@@ -63,6 +67,8 @@ impl Default for Config {
             llama_cpp_dir: None,
             model_dirs,
             include_ollama: true,
+            discovery: true,
+            notifications: true,
             rpc: RpcConfig::default(),
             llm: LlmConfig::default(),
         }
@@ -106,10 +112,16 @@ impl Config {
         if self.llm.port == self.panel_port || self.rpc.port == self.panel_port {
             bail!("los puertos del panel, RPC y llama-server deben ser distintos");
         }
-        self.rpc
+        let bind = self
+            .rpc
             .bind
             .parse::<IpAddr>()
             .with_context(|| format!("«{}» no es una IP válida para RPC", self.rpc.bind))?;
+        if !is_lan_ip(bind) {
+            bail!(
+                "el servidor RPC solo puede escuchar en este equipo o en una IP de red local, no en {bind}"
+            );
+        }
         if !self
             .rpc
             .device
@@ -119,8 +131,7 @@ impl Config {
             bail!("el dispositivo RPC solo admite letras, números y comas (p. ej. Vulkan0)");
         }
         for peer in &self.llm.rpc_peers {
-            peer.parse::<SocketAddr>()
-                .with_context(|| format!("«{peer}» no tiene la forma ip:puerto"))?;
+            parse_lan_socket(peer)?;
         }
         if self.llm.ctx_size < 256 {
             bail!("el contexto debe ser de al menos 256 tokens");
@@ -137,6 +148,33 @@ impl Config {
     }
 }
 
+/// Loopback, red privada o enlace local. El RPC de llama.cpp no tiene
+/// autenticación: nunca se usa con direcciones públicas.
+pub fn is_lan_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || v4.is_link_local(),
+        IpAddr::V6(v6) => {
+            let first = v6.segments()[0];
+            v6.is_loopback() || (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
+        }
+    }
+}
+
+/// Interpreta `ip:puerto` y exige que sea una dirección de red local.
+pub fn parse_lan_socket(text: &str) -> anyhow::Result<SocketAddr> {
+    let addr = text
+        .trim()
+        .parse::<SocketAddr>()
+        .with_context(|| format!("«{text}» no tiene la forma ip:puerto"))?;
+    if !is_lan_ip(addr.ip()) {
+        bail!("{} no es una dirección de red local", addr.ip());
+    }
+    if addr.port() == 0 {
+        bail!("el puerto no puede ser 0");
+    }
+    Ok(addr)
+}
+
 pub fn home_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE")
         .or_else(|| std::env::var_os("HOME"))
@@ -145,6 +183,10 @@ pub fn home_dir() -> Option<PathBuf> {
 
 /// Directorio de configuración y logs del programa.
 pub fn config_dir() -> PathBuf {
+    // Permite una segunda instancia aislada en el mismo equipo (pruebas).
+    if let Some(dir) = std::env::var_os("UAC_CONFIG_DIR") {
+        return PathBuf::from(dir);
+    }
     let base = std::env::var_os("APPDATA")
         .map(PathBuf::from)
         .or_else(|| home_dir().map(|h| h.join(".config")))
@@ -259,6 +301,32 @@ mod tests {
 
         let mut cfg = Config::default();
         cfg.llm.port = cfg.panel_port;
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn only_lan_addresses() {
+        for ok in [
+            "127.0.0.1",
+            "192.168.1.10",
+            "10.0.0.5",
+            "172.16.3.4",
+            "169.254.7.9",
+            "::1",
+            "fe80::1",
+            "fd00::1",
+        ] {
+            assert!(is_lan_ip(ok.parse().unwrap()), "{ok}");
+        }
+        for bad in ["8.8.8.8", "0.0.0.0", "172.32.0.1", "2001:db8::1"] {
+            assert!(!is_lan_ip(bad.parse().unwrap()), "{bad}");
+        }
+        assert!(parse_lan_socket("192.168.1.20:50052").is_ok());
+        assert!(parse_lan_socket("8.8.8.8:50052").is_err());
+        assert!(parse_lan_socket("192.168.1.20").is_err());
+
+        let mut cfg = Config::default();
+        cfg.rpc.bind = "0.0.0.0".to_string();
         assert!(cfg.validate().is_err());
     }
 

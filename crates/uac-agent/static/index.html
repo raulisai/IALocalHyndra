@@ -3,155 +3,225 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nodo UAC</title>
+<title>Clúster UAC</title>
 <style>
 :root {
-  --bg: #f5f6f8; --card: #ffffff; --text: #1b1f24; --muted: #5d6673;
-  --line: #e1e4e8; --accent: #0f8f7e; --accent-text: #ffffff;
-  --ok: #1a7f37; --warn: #9a6700; --bad: #c4314b; --chip: #eef1f4;
+  --bg: #f3f5f7; --card: #ffffff; --text: #171b21; --muted: #5c6672; --line: #dfe3e8;
+  --accent: #0f8f7e; --accent-soft: #d9f1ed; --accent-text: #ffffff;
+  --ok: #1a7f37; --ok-soft: #dff3e4; --warn: #9a6700; --warn-soft: #fbf0d0;
+  --bad: #c4314b; --bad-soft: #fbe1e6; --idle: #77818d; --idle-soft: #e9ecf0;
+  --map-dot: #d5dae0; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 4px 14px rgba(16,24,40,.06);
   --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #111418; --card: #1a1e24; --text: #e6e9ed; --muted: #9aa4b1;
-    --line: #2b313a; --accent: #2bb5a1; --accent-text: #08201c;
-    --ok: #4ac26b; --warn: #d4a72c; --bad: #f2667f; --chip: #242a32;
+    --bg: #0f1216; --card: #181c22; --text: #e7eaee; --muted: #98a2af; --line: #2a3038;
+    --accent: #2bb5a1; --accent-soft: #12332f; --accent-text: #06201c;
+    --ok: #4ac26b; --ok-soft: #153220; --warn: #d4a72c; --warn-soft: #3a2f10;
+    --bad: #f2667f; --bad-soft: #3d1a22; --idle: #8a94a1; --idle-soft: #242a32;
+    --map-dot: #2a3038; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
   }
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
-header { display: flex; align-items: center; gap: 12px; padding: 16px 24px;
-  border-bottom: 1px solid var(--line); background: var(--card); flex-wrap: wrap; }
-header h1 { font-size: 18px; margin: 0; }
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
-.muted { color: var(--muted); }
-main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px;
-  display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; min-width: 0; }
-section.wide { grid-column: 1 / -1; }
-h2 { font-size: 15px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
-dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
-.chip { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--chip);
-  font-size: 12.5px; margin: 2px 4px 2px 0; }
-.chip.detected, .chip.verified, .chip.on { color: var(--ok); }
-.chip.expected, .chip.unknown { color: var(--warn); }
-.chip.unsupported, .chip.off { color: var(--bad); }
-.warn { color: var(--warn); } .bad { color: var(--bad); }
-button { font: inherit; border: 1px solid var(--line); background: var(--chip); color: var(--text);
-  border-radius: 7px; padding: 5px 12px; cursor: pointer; }
-button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  background: var(--card); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+header h1 { font-size: 17px; margin: 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px var(--ok-soft); }
+.dot.bad { background: var(--bad); box-shadow: 0 0 0 4px var(--bad-soft); }
+.muted { color: var(--muted); } .grow { flex: 1; }
+main { max-width: 1120px; margin: 0 auto; padding: 18px 16px 56px; display: grid; gap: 16px; }
+.cols { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+section, details.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; min-width: 0; box-shadow: var(--shadow); }
+h2 { font-size: 15px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lead { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px;
+  padding: 6px 13px; cursor: pointer; white-space: nowrap; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
+button.small { padding: 3px 10px; font-size: 13px; }
 button:disabled { opacity: .5; cursor: default; }
-input, select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
-  border-radius: 6px; padding: 5px 8px; width: 100%; }
+input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; width: 100%; }
 label { display: block; margin-bottom: 10px; }
 label span { display: block; color: var(--muted); font-size: 13px; margin-bottom: 2px; }
-.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
-.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 14px; }
-pre { font: 12px/1.45 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
-  padding: 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; margin: 8px 0 0; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-td, th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
-td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 14px; }
+.pill { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 12.5px; font-weight: 600; background: var(--idle-soft); color: var(--idle); white-space: nowrap; }
+.pill.use, .pill.self { background: var(--accent-soft); color: var(--accent); }
+.pill.avail, .pill.on { background: var(--ok-soft); color: var(--ok); }
+.pill.off { background: var(--bad-soft); color: var(--bad); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.note { font-size: 13.5px; margin: 8px 0 0; padding: 7px 10px; border-radius: 8px; background: var(--idle-soft); color: var(--muted); }
+.note.ok { background: var(--ok-soft); color: var(--ok); } .note.warn { background: var(--warn-soft); color: var(--warn); }
+.note.bad { background: var(--bad-soft); color: var(--bad); } .note.accent { background: var(--accent-soft); color: var(--accent); }
 code { font-family: var(--mono); font-size: 13px; }
-#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text);
-  color: var(--bg); padding: 8px 14px; border-radius: 8px; display: none; max-width: 90vw; }
+pre { font: 12px/1.45 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 8px;
+  max-height: 220px; overflow: auto; white-space: pre-wrap; margin: 8px 0 0; }
+details > summary { cursor: pointer; color: var(--muted); font-size: 13.5px; margin-top: 10px; }
+details.card > summary { color: var(--text); font-weight: 600; font-size: 15px; margin: 0; }
+details.card[open] > summary { margin-bottom: 12px; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
+dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Mapa del clúster */
+#map { position: relative; height: 300px; margin: 6px 0 4px; border-radius: 10px; overflow: hidden;
+  background-image: radial-gradient(var(--map-dot) 1px, transparent 1px); background-size: 22px 22px; }
+#map.tall { height: 420px; }
+#map > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#map line { stroke: var(--idle); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+#map line.idle { stroke-dasharray: 2 7; }
+#map line.off { stroke: var(--bad); stroke-dasharray: 2 9; opacity: .6; }
+#map line.avail { stroke: var(--ok); }
+#map line.use { stroke: var(--accent); stroke-width: 3; }
+#map line.flow { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 10 8; animation: flow 0.7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -18; } }
+.node { position: absolute; transform: translate(-50%, -50%); width: 176px; padding: 10px 10px 9px; text-align: center;
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); z-index: 2; }
+.node.self { border-color: var(--accent); }
+.node.avail { border-color: var(--ok); } .node.use { border-color: var(--accent); } .node.off { opacity: .62; border-style: dashed; }
+.node svg { width: 26px; height: 26px; color: var(--muted); display: block; margin: 0 auto 2px; }
+.node.self svg, .node.use svg { color: var(--accent); } .node.avail svg { color: var(--ok); }
+.node-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-sub { color: var(--muted); font-size: 12.5px; min-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node .pill { margin-top: 4px; } .node button { margin-top: 7px; }
+.link-label { position: absolute; transform: translate(-50%, -50%); z-index: 1; font-size: 12px; padding: 0 7px; border-radius: 99px;
+  background: var(--card); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.radar { position: absolute; width: 0; height: 0; z-index: 0; }
+.radar i { position: absolute; left: -150px; top: -150px; width: 300px; height: 300px; border-radius: 50%;
+  border: 2px solid var(--accent); opacity: 0; animation: ping 2.7s ease-out infinite; }
+.radar i:nth-child(2) { animation-delay: .9s; } .radar i:nth-child(3) { animation-delay: 1.8s; }
+@keyframes ping { from { transform: scale(.25); opacity: .55; } to { transform: scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .radar i, #map line.flow { animation: none; } }
+@media (max-width: 640px) { .node { width: 132px; font-size: 13px; } .node svg { width: 20px; height: 20px; } }
+
+.peer { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.peer:first-child { border-top: 0; }
+.peer.flash { animation: flash 1.2s ease-out; } @keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+.peer-main { flex: 1; min-width: 180px; } .peer-meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.event { display: flex; gap: 8px; padding: 5px 0; font-size: 14px; border-top: 1px solid var(--line); }
+.event:first-child { border-top: 0; } .event time { color: var(--muted); font-size: 12.5px; white-space: nowrap; margin-left: auto; }
+.ev-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: var(--idle); flex: none; }
+.ev-dot.joined, .ev-dot.rpc_up { background: var(--ok); } .ev-dot.left { background: var(--bad); } .ev-dot.rpc_down { background: var(--warn); }
+#toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 20; max-width: min(380px, 92vw); }
+.toast { background: var(--text); color: var(--bg); padding: 9px 14px; border-radius: 10px; box-shadow: var(--shadow); animation: rise .25s ease-out; }
+@keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+.spin { display: inline-block; animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td { padding: 4px 6px; border-bottom: 1px solid var(--line); } td.num { text-align: right; white-space: nowrap; }
 </style>
 </head>
 <body>
 <header>
   <span class="dot" id="dot"></span>
-  <h1 id="title">Nodo UAC</h1>
+  <h1 id="title">Clúster UAC</h1>
   <span class="muted" id="subtitle">cargando…</span>
+  <span class="grow"></span>
+  <button id="scan"><span id="scan-icon">⟳</span> Buscar equipos</button>
 </header>
 
 <main>
   <section>
-    <h2>Equipo <button id="reprobe">Volver a sondear</button></h2>
-    <dl id="machine"></dl>
+    <h2>Tu clúster <span class="muted" id="summary" style="font-weight:normal"></span></h2>
+    <div id="map"></div>
+    <div id="map-hint"></div>
   </section>
 
-  <section>
-    <h2>GPU</h2>
-    <div id="gpus" class="muted">sondeando…</div>
-  </section>
+  <div class="cols">
+    <section>
+      <h2>Ejecutar un modelo <span class="pill" id="llm-state">detenido</span></h2>
+      <p class="lead">Elige un modelo y pulsa Iniciar. Si no cabe en esta GPU, se reparte entre los equipos que estés usando.</p>
+      <select id="model"></select>
+      <div id="fit"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="llm-start">Iniciar</button>
+        <button id="llm-stop">Detener</button>
+        <a id="chat-link" href="#" target="_blank" rel="noopener" hidden><button class="primary" type="button">Abrir chat ↗</button></a>
+      </div>
+      <details><summary>Registro de llama-server</summary><div class="muted" id="llm-cmd" style="font-size:12.5px;margin-top:6px"></div><pre id="llm-log"></pre></details>
+    </section>
 
-  <section>
-    <h2>Red</h2>
-    <div id="nics"></div>
-  </section>
+    <section>
+      <h2>Compartir mi GPU <span class="pill" id="rpc-state">no compartida</span></h2>
+      <p class="lead">Deja que otro equipo de tu red use la GPU de este para cargar modelos más grandes.</p>
+      <label><span>Por dónde compartir</span><select id="bind"></select></label>
+      <div class="row">
+        <button class="primary" id="rpc-start">Compartir mi GPU</button>
+        <button id="rpc-stop">Dejar de compartir</button>
+      </div>
+      <div id="rpc-note"></div>
+      <details><summary>Registro del servidor RPC</summary><div class="muted" id="rpc-cmd" style="font-size:12.5px;margin-top:6px"></div><pre id="rpc-log"></pre></details>
+    </section>
+  </div>
 
-  <section>
-    <h2>llama.cpp</h2>
-    <dl id="llama"></dl>
-  </section>
+  <div class="cols">
+    <section>
+      <h2>Equipos</h2>
+      <div id="peers"></div>
+      <details><summary>Añadir un equipo por su IP</summary>
+        <p class="lead" style="margin:8px 0">Para un equipo que solo tiene el servidor RPC de llama.cpp, sin este programa.</p>
+        <form id="add-peer" class="row"><input id="add-addr" placeholder="192.168.1.20:50052" style="flex:1;min-width:180px" required><button>Añadir</button></form>
+      </details>
+    </section>
+    <section>
+      <h2>Actividad</h2>
+      <div id="events"></div>
+    </section>
+  </div>
 
-  <section class="wide">
-    <h2>Probar un modelo <span class="chip off" id="llm-state">detenido</span></h2>
-    <p class="muted" style="margin:0 0 8px">Arranca <code>llama-server</code> con un modelo local y abre su chat. Si hay nodos RPC configurados, reparte el modelo entre ellos.</p>
-    <div class="row">
-      <select id="model" style="flex:1; min-width:240px"></select>
-      <button class="primary" id="llm-start">Iniciar</button>
-      <button id="llm-stop">Detener</button>
-      <a id="chat-link" href="#" target="_blank" rel="noopener" style="display:none">Abrir chat ↗</a>
+  <details class="card">
+    <summary>Este equipo</summary>
+    <div class="cols">
+      <div><div class="row" style="margin-bottom:8px"><strong>Hardware</strong><span class="grow"></span><button class="small" id="reprobe">Volver a sondear</button></div><dl id="machine"></dl></div>
+      <div><strong>GPU</strong><div id="gpus" style="margin-top:8px"></div></div>
+      <div><strong>Red</strong><div id="nics" style="margin-top:8px"></div></div>
+      <div><strong>llama.cpp</strong><dl id="llama" style="margin-top:8px"></dl></div>
     </div>
-    <div class="muted" id="llm-cmd" style="margin-top:6px"></div>
-    <pre id="llm-log" hidden></pre>
-  </section>
+  </details>
 
-  <section class="wide">
-    <h2>Prestar esta GPU por RPC <span class="chip off" id="rpc-state">detenido</span></h2>
-    <p class="muted" style="margin:0 0 8px">Arranca <code>ggml-rpc-server</code> para que otro nodo use esta GPU. No tiene autenticación: en una IP de red local, abre el puerto en el firewall solo para tus otros equipos.</p>
-    <div class="row">
-      <button class="primary" id="rpc-start">Iniciar</button>
-      <button id="rpc-stop">Detener</button>
-      <span class="muted" id="rpc-cmd"></span>
-    </div>
-    <pre id="rpc-log" hidden></pre>
-  </section>
-
-  <section class="wide">
-    <h2>Configuración <span class="muted" id="cfg-path" style="font-weight:normal;font-size:13px"></span></h2>
+  <details class="card">
+    <summary>Configuración</summary>
     <form id="cfg">
       <div class="grid2">
-        <label><span>Nombre del nodo (vacío = nombre del equipo)</span><input name="node_name"></label>
-        <label><span>Puerto del panel (requiere reiniciar)</span><input name="panel_port" type="number" min="1" max="65535"></label>
-        <label><span>Carpeta de llama.cpp (vacío = automática)</span><input name="llama_cpp_dir"></label>
-        <label><span>Carpetas de modelos (una por línea)</span><textarea name="model_dirs" rows="2" style="width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px"></textarea></label>
+        <label><span>Nombre de este equipo (vacío = nombre de Windows)</span><input name="node_name"></label>
+        <label><span>Buscar otros equipos automáticamente (requiere reiniciar)</span><select name="discovery"><option value="true">Sí</option><option value="false">No</option></select></label>
+        <label><span>Avisos de Windows al conectarse un equipo</span><select name="notifications"><option value="true">Sí</option><option value="false">No</option></select></label>
         <label><span>Incluir modelos de Ollama</span><select name="include_ollama"><option value="true">Sí</option><option value="false">No</option></select></label>
-      </div>
-      <h2 style="margin-top:8px">llama-server</h2>
-      <div class="grid2">
-        <label><span>Puerto</span><input name="llm.port" type="number" min="1" max="65535"></label>
-        <label><span>Capas en GPU (-ngl)</span><input name="llm.gpu_layers" type="number" min="0"></label>
+        <label><span>Carpetas de modelos (una por línea)</span><textarea name="model_dirs" rows="2"></textarea></label>
+        <label><span>Carpeta de llama.cpp (vacío = automática)</span><input name="llama_cpp_dir"></label>
+        <label><span>Capas del modelo en GPU</span><input name="llm.gpu_layers" type="number" min="0"></label>
         <label><span>Contexto (tokens)</span><input name="llm.ctx_size" type="number" min="256"></label>
-        <label><span>Nodos RPC para repartir (ip:puerto, separados por comas)</span><input name="llm.rpc_peers" placeholder="192.168.1.20:50052"></label>
+        <label><span>Puerto del chat</span><input name="llm.port" type="number" min="1" max="65535"></label>
+        <label><span>Puerto para compartir GPU</span><input name="rpc.port" type="number" min="1" max="65535"></label>
+        <label><span>Dispositivo a compartir (vacío = todos)</span><input name="rpc.device" placeholder="Vulkan0"></label>
+        <label><span>Puerto de este panel (requiere reiniciar)</span><input name="panel_port" type="number" min="1" max="65535"></label>
       </div>
-      <h2 style="margin-top:8px">Servidor RPC</h2>
-      <div class="grid2">
-        <label><span>IP de escucha (127.0.0.1 = solo este equipo)</span><input name="rpc.bind"></label>
-        <label><span>Puerto</span><input name="rpc.port" type="number" min="1" max="65535"></label>
-        <label><span>Dispositivo (vacío = todos; p. ej. Vulkan0)</span><input name="rpc.device"></label>
-        <label><span>Caché local de tensores (-c)</span><select name="rpc.cache"><option value="true">Sí</option><option value="false">No</option></select></label>
-      </div>
-      <div class="row"><button class="primary" type="submit">Guardar</button><span class="muted" id="cfg-msg"></span></div>
+      <div class="row"><button class="primary" type="submit">Guardar</button><span class="muted" id="cfg-msg"></span><span class="grow"></span><span class="muted" id="cfg-path" style="font-size:12.5px"></span></div>
     </form>
-  </section>
+  </details>
 </main>
-<div id="toast"></div>
+<div id="toasts"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const gib = (b) => b == null ? "?" : (b / 2 ** 30).toFixed(1) + " GiB";
+const gib = (b) => b ? (b / 2 ** 30).toFixed(1) + " GiB" : "?";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-let last = null, editing = false, modelsLoaded = false;
+const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
+let last = null, models = [], editing = false, lastEvent = null, pressed = false;
+// Mientras se pulsa un botón no se redibuja, para que el clic no se pierda.
+document.addEventListener("pointerdown", () => (pressed = true));
+document.addEventListener("pointerup", () => setTimeout(() => (pressed = false), 50));
+const sigs = {};
 
-function toast(msg, ms = 3500) {
-  const t = $("toast"); t.textContent = msg; t.style.display = "block";
-  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.style.display = "none"), ms);
+/** Ejecuta `fn` solo si `value` cambió: evita reiniciar animaciones y perder el foco. */
+function when(key, value, fn) {
+  const sig = JSON.stringify(value);
+  if (sigs[key] !== sig) { sigs[key] = sig; fn(); }
 }
-
+function toast(msg, ms = 4500) {
+  const el = document.createElement("div");
+  el.className = "toast"; el.textContent = msg;
+  $("toasts").append(el); setTimeout(() => el.remove(), ms);
+}
 async function api(method, path, body) {
   const opts = { method, headers: { "X-UAC-Panel": "1" } };
   if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
@@ -160,151 +230,246 @@ async function api(method, path, body) {
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
 }
-
-function fmtUptime(s) {
+function ago(s) {
   if (s == null) return "";
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  return h ? `${h} h ${m} min` : m ? `${m} min` : `${s} s`;
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+const short = (gpu) => gpu.replace(/^(AMD|NVIDIA|Apple|Intel\(R\))\s+/i, "").replace(/^(Radeon|GeForce)\s+/i, "");
+
+function peerState(p, s) {
+  if (!p.online) return { cls: "off", link: "off", label: p.source === "manual" ? "sin respuesta" : "desconectado" };
+  const busy = s.llm.running && s.llm_split;
+  if (p.rpc && p.in_use) return { cls: "use", link: busy ? "flow" : "use", label: busy ? "en uso ahora" : "lista para usar" };
+  if (p.rpc) return { cls: "avail", link: "avail", label: "GPU disponible" };
+  return { cls: "idle", link: "idle", label: "conectado" };
+}
+function peerAction(p) {
+  if (p.in_use) return `<button class="small" data-act="unuse" data-addr="${esc(p.rpc)}">Dejar de usar</button>`;
+  if (p.online && p.rpc) return `<button class="small primary" data-act="use" data-addr="${esc(p.rpc)}">Usar su GPU</button>`;
+  return "";
 }
 
-function render(s) {
-  last = s;
-  $("title").textContent = s.node_name ? `Nodo ${s.node_name}` : "Nodo UAC";
-  $("subtitle").textContent = `activo · ${fmtUptime(s.uptime_secs)} · v${s.version}`;
-  $("dot").style.background = "var(--ok)";
+function layout(n) {
+  if (n === 0) return { self: [50, 50], peers: [] };
+  if (n === 1) return { self: [27, 50], peers: [[73, 50]] };
+  const start = n === 2 ? 180 : n === 4 ? -135 : -90;
+  const peers = Array.from({ length: n }, (_, i) => {
+    const a = (start + (360 / n) * i) * Math.PI / 180;
+    return [50 + 37 * Math.cos(a), 50 + 35 * Math.sin(a)];
+  });
+  return { self: [50, 50], peers };
+}
+
+function renderMap(s) {
+  const peers = s.peers, pos = layout(peers.length), [sx, sy] = pos.self;
+  const anyOnline = peers.some((p) => p.online);
+  const map = $("map");
+  map.classList.toggle("tall", peers.length > 2);
+  let lines = "", labels = "", nodes = "";
+  peers.forEach((p, i) => {
+    const [x, y] = pos.peers[i], st = peerState(p, s);
+    lines += `<line class="${st.link}" x1="${sx}" y1="${sy}" x2="${x}" y2="${y}"/>`;
+    const lat = p.online && p.rpc_latency_ms != null ? `${p.rpc_latency_ms} ms` : p.online && p.rpc && p.rpc_reachable === false ? "ocupada o bloqueada" : "";
+    if (lat) labels += `<div class="link-label" style="left:${(sx + x) / 2}%;top:${(sy + y) / 2}%">${lat}</div>`;
+    const sub = p.gpu ? `${esc(short(p.gpu))} · ${gib(p.vram_bytes)}` : p.source === "manual" ? esc(p.rpc) : "sin datos de GPU";
+    nodes += `<div class="node ${st.cls}" style="left:${x}%;top:${y}%" data-peer="${esc(p.id)}" title="${esc(p.name)}">
+      ${ICON}<div class="node-name">${esc(p.name)}</div><div class="node-sub">${sub}</div>
+      <span class="pill ${st.cls}">${st.label}</span><div>${peerAction(p)}</div></div>`;
+  });
+  const me = s.self;
+  const selfPill = me.model ? `<span class="pill use">ejecutando modelo</span>` : me.sharing ? `<span class="pill avail">compartiendo GPU</span>` : `<span class="pill self">este equipo</span>`;
+  nodes += `<div class="node self" style="left:${sx}%;top:${sy}%">${ICON}<div class="node-name">${esc(s.node_name)}</div>
+    <div class="node-sub">${me.gpu ? `${esc(short(me.gpu))} · ${gib(me.vram_bytes)}` : "detectando GPU…"}</div>${selfPill}</div>`;
+  const radar = (!anyOnline || s.discovery.scanning) && s.discovery.running ? `<div class="radar" style="left:${sx}%;top:${sy}%"><i></i><i></i><i></i></div>` : "";
+  map.innerHTML = `${radar}<svg viewBox="0 0 100 100" preserveAspectRatio="none">${lines}</svg>${labels}${nodes}`;
+
+  const online = peers.filter((p) => p.online).length;
+  const shared = peers.filter((p) => p.online && p.in_use).reduce((a, p) => a + p.usable_bytes, 0);
+  $("summary").textContent = `· ${online + 1} ${online ? "equipos" : "equipo"} · ${gib(me.usable_bytes + shared)} de GPU utilizables${shared ? ` (${gib(shared)} de otros equipos)` : ""}`;
+
+  const d = s.discovery;
+  $("map-hint").innerHTML = d.error ? `<p class="note bad">${esc(d.error)}</p>`
+    : !d.enabled ? `<p class="note warn">La búsqueda automática está desactivada. Actívala en Configuración o añade equipos por su IP.</p>`
+    : !peers.length ? `<p class="note accent">Buscando otros equipos en tu red… Abre este programa en otra computadora conectada a la misma red, o unida a esta con un cable Ethernet, y aparecerá aquí sola.</p>`
+    : peers.some((p) => p.online && !p.rpc) && !peers.some((p) => p.rpc) ? `<p class="note">Para usar la GPU de otro equipo, pulsa «Compartir mi GPU» en su panel.</p>` : "";
+}
+
+function renderPeers(s) {
+  $("peers").innerHTML = s.peers.length ? s.peers.map((p) => {
+    const st = peerState(p, s);
+    const meta = [p.gpu && `${esc(p.gpu)} · ${gib(p.vram_bytes)} (${gib(p.usable_bytes)} utilizables)`, p.backend, p.addr && `IP ${esc(p.addr)}`,
+      p.rpc_latency_ms != null && `${p.rpc_latency_ms} ms`, p.model && `ejecuta ${esc(p.model)}`, p.os, p.version && `v${esc(p.version)}`,
+      p.source === "manual" && "añadido a mano", !p.online && p.seen_secs_ago != null && `visto hace ${ago(p.seen_secs_ago)}`].filter(Boolean).join(" · ");
+    return `<div class="peer" id="peer-${esc(p.id)}"><div class="peer-main"><strong>${esc(p.name)}</strong> <span class="pill ${st.cls}">${st.label}</span>
+      <div class="peer-meta">${meta}</div></div>${peerAction(p)}</div>`;
+  }).join("") : `<p class="muted" style="margin:6px 0">Todavía no hay otros equipos.</p>`;
+}
+
+function renderEvents(s) {
+  const now = Date.now() / 1000;
+  $("events").innerHTML = s.events.length ? [...s.events].reverse().slice(0, 12).map((e) =>
+    `<div class="event"><span class="ev-dot ${e.kind}"></span><span>${esc(e.text)}</span><time>hace ${ago(Math.max(0, Math.round(now - e.unix_secs)))}</time></div>`).join("")
+    : `<p class="muted" style="margin:6px 0">Aquí verás cuándo se conecta o desconecta un equipo.</p>`;
+  const newest = s.events.length ? s.events[s.events.length - 1].id : 0;
+  if (lastEvent !== null) s.events.filter((e) => e.id > lastEvent).forEach((e) => toast(e.text));
+  lastEvent = newest;
+}
+
+const FIT = { local: "cabe en esta GPU", split: "se repartirá", too_big: "no cabe", unknown: "" };
+function renderModels() {
+  const sel = $("model"), prev = sel.value;
+  sel.innerHTML = models.length ? models.map((m) => `<option value="${esc(m.path)}">${esc(m.name)} — ${gib(m.size_bytes)}${FIT[m.fit] ? " · " + FIT[m.fit] : ""}</option>`).join("")
+    : '<option value="">No se encontraron modelos .gguf</option>';
+  if (prev && models.some((m) => m.path === prev)) sel.value = prev;
+  renderFit();
+}
+function renderFit() {
+  const m = models.find((x) => x.path === $("model").value), s = last;
+  if (!m || !s) { $("fit").innerHTML = ""; return; }
+  const inUse = s.peers.filter((p) => p.in_use && p.online), using = inUse.length;
+  const need = gib(m.required_bytes), have = gib(s.self.usable_bytes), total = gib(s.self.usable_bytes + inUse.reduce((a, p) => a + p.usable_bytes, 0));
+  $("fit").innerHTML = m.fit === "local" ? `<p class="note ok">Cabe en la GPU de este equipo (necesita unos ${need} de ${have}). Se ejecuta solo aquí, que es lo más rápido.</p>`
+    : m.fit === "split" ? `<p class="note accent">No cabe en esta GPU (necesita unos ${need}). Se repartirá entre este equipo y ${using} más. Será más lento que en una sola GPU.</p>`
+    : m.fit === "too_big" ? `<p class="note bad">Necesita unos ${need} y ${using ? `entre los ${using + 1} equipos hay ${total}` : `aquí hay ${have}`} utilizables. Conecta otro equipo y usa su GPU, o elige un modelo más pequeño.</p>` : "";
+}
+async function loadModels() {
+  try { models = await api("GET", "/api/models"); renderModels(); } catch (e) { toast("Modelos: " + e.message); }
+}
+
+function renderProcs(s) {
+  const llm = s.llm, rpc = s.rpc, hasLlama = !!s.llama.dir;
+  $("llm-state").textContent = llm.running ? `en marcha · ${ago(llm.uptime_secs)}` : llm.last_exit ? "detenido" : "detenido";
+  $("llm-state").className = "pill " + (llm.running ? "on" : "");
+  $("llm-start").disabled = llm.running || !hasLlama; $("llm-stop").disabled = !llm.running;
+  $("chat-link").hidden = !llm.running; $("chat-link").href = `http://127.0.0.1:${s.config.llm.port}/`;
+  $("rpc-state").textContent = rpc.running ? (s.self.sharing ? `compartida en ${s.self.sharing}` : "en marcha solo en este equipo") : "no compartida";
+  $("rpc-state").className = "pill " + (rpc.running ? (s.self.sharing ? "on" : "warn") : "");
+  $("rpc-start").disabled = rpc.running || !hasLlama; $("rpc-stop").disabled = !rpc.running; $("bind").disabled = rpc.running;
+  for (const [k, p] of [["llm", llm], ["rpc", rpc]]) {
+    $(`${k}-cmd`).textContent = p.command_line ? `$ ${p.command_line}` : "";
+    const log = $(`${k}-log`), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+    log.textContent = p.log.join("\n") || "(sin salida todavía)";
+    if (atBottom) log.scrollTop = log.scrollHeight;
+  }
+  $("rpc-note").innerHTML = !hasLlama ? `<p class="note bad">No se encontró llama.cpp. Consulta docs/llama-cpp.md.</p>`
+    : rpc.running && s.self.sharing ? `<p class="note ok">Otros equipos ya pueden usar esta GPU. Si no la ven, permite el programa en el aviso del firewall de Windows.</p>`
+    : rpc.running ? `<p class="note warn">Solo accesible desde este mismo equipo. Para que otro equipo la use, deja de compartir y elige una conexión de red.</p>`
+    : `<p class="note">El uso compartido no tiene contraseña: cualquiera en tu red podría usar la GPU mientras esté activo.</p>`;
+}
+
+function renderBind(s) {
+  const wifi = (n) => /wi-?fi|wireless|wlan|inalámbrica/i.test(n);
+  $("bind").innerHTML = [...s.addresses].sort((a, b) => wifi(a.name) - wifi(b.name)).map((a) => `<option value="${a.ip}">${esc(a.name)}${wifi(a.name) ? " (más lento)" : " (cable)"} — ${a.ip}</option>`).join("")
+    + `<option value="127.0.0.1">Solo este equipo (para pruebas)</option>`;
+  const cur = s.config.rpc.bind;
+  $("bind").value = [...$("bind").options].some((o) => o.value === cur) && cur !== "127.0.0.1" ? cur : ($("bind").options[0]?.value ?? "127.0.0.1");
+}
+
+function renderMachine(s) {
   const r = s.report;
-
-  $("machine").innerHTML = r ? `
-    <dt>Equipo</dt><dd>${esc(r.hostname)}</dd>
-    <dt>Sistema</dt><dd>${esc(r.os.version || r.os.family)} · ${esc(r.os.arch)}</dd>
-    <dt>CPU</dt><dd>${esc(r.cpu.model || "?")}${r.cpu.physical_cores ? ` · ${r.cpu.physical_cores} núcleos / ${r.cpu.logical_cores} hilos` : ""}</dd>
-    <dt>RAM</dt><dd>${gib(r.ram_bytes)}</dd>
-    ${r.warnings.map((w) => `<dt class="warn">Aviso</dt><dd class="warn">${esc(w)}</dd>`).join("")}
-  ` : `<dt>Estado</dt><dd>sondeando el hardware…</dd>`;
-
-  $("gpus").innerHTML = !r ? "sondeando…" : r.gpus.length ? r.gpus.map((g) => `
-    <div style="margin-bottom:10px">
-      <strong>${esc(g.name)}</strong> <span class="muted">· ${gib(g.vram_bytes)} · ${g.memory_kind === "shared" ? "integrada (no se usa)" : g.memory_kind === "unified" ? "memoria unificada" : "VRAM dedicada"}</span><br>
-      ${g.backends.map((b) => `<span class="chip ${b.status}" title="${esc(b.note || "")}">${b.backend}: ${b.status}</span>`).join("")}
-    </div>`).join("") + `<div class="muted" style="font-size:13px">«detected» = driver presente. Ningún backend pasa a «verified» sin un benchmark.</div>`
-    : `<span class="bad">No se detectó ninguna GPU.</span>`;
-
-  $("nics").innerHTML = !r ? "" : `<table>${r.nics.map((n) => `
-    <tr><td>${esc(n.name)}${n.is_virtual ? ' <span class="muted">(virtual)</span>' : ""}</td>
-    <td class="num">${n.link_bps ? (n.link_bps / 1e6).toFixed(0) + " Mb/s" : "?"}</td></tr>`).join("")}</table>
-    ${r.nics.some((n) => !n.is_virtual && /wi-?fi|wireless|wlan/i.test(n.name + (n.description || ""))) && !r.nics.some((n) => !n.is_virtual && !/wi-?fi|wireless|wlan/i.test(n.name + (n.description || "")))
-      ? '<p class="warn" style="margin:8px 0 0">Solo hay Wi-Fi. Para repartir modelos entre equipos conviene Ethernet.</p>' : ""}`;
-
+  $("machine").innerHTML = r ? `<dt>Equipo</dt><dd>${esc(r.hostname)}</dd><dt>Sistema</dt><dd>${esc(r.os.version || r.os.family)} · ${esc(r.os.arch)}</dd>
+    <dt>CPU</dt><dd>${esc(r.cpu.model || "?")}${r.cpu.physical_cores ? ` · ${r.cpu.physical_cores} núcleos / ${r.cpu.logical_cores} hilos` : ""}</dd><dt>RAM</dt><dd>${gib(r.ram_bytes)}</dd>
+    ${r.warnings.map((w) => `<dt>Aviso</dt><dd style="color:var(--warn)">${esc(w)}</dd>`).join("")}` : `<dt>Estado</dt><dd>sondeando el hardware…</dd>`;
+  $("gpus").innerHTML = !r ? "sondeando…" : r.gpus.map((g) => `<div style="margin-bottom:8px"><strong>${esc(g.name)}</strong> <span class="muted">· ${gib(g.vram_bytes)}</span><br>
+    ${g.backends.map((b) => `<span class="pill ${b.status === "detected" || b.status === "verified" ? "on" : b.status === "unsupported" ? "off" : "warn"}" title="${esc(b.note || "")}">${b.backend}: ${b.status}</span>`).join(" ")}</div>`).join("") || "No se detectó ninguna GPU.";
+  $("nics").innerHTML = !r ? "" : `<table>${r.nics.filter((n) => !n.is_virtual).map((n) => `<tr><td>${esc(n.name)}</td><td class="num">${n.link_bps ? (n.link_bps / 1e6).toFixed(0) + " Mb/s" : "?"}</td></tr>`).join("")}</table>`;
   const tools = s.llama.tools || {};
-  $("llama").innerHTML = s.llama.dir ? `
-    <dt>Carpeta</dt><dd><code>${esc(s.llama.dir)}</code></dd>
-    <dt>Programas</dt><dd>${Object.entries(tools).map(([k, v]) => `<span class="chip ${v ? "on" : "off"}">${k}</span>`).join("")}</dd>`
-    : `<dt>Estado</dt><dd class="bad">No encontrado. Descarga el build fijado (ver docs/llama-cpp.md) en <code>tools/llama.cpp/</code> o indica la carpeta en la configuración.</dd>`;
-
-  renderProc("llm", s.llm);
-  renderProc("rpc", s.rpc);
-  const chat = $("chat-link");
-  chat.href = `http://127.0.0.1:${s.config.llm.port}/`;
-  chat.style.display = s.llm.running ? "" : "none";
-  $("cfg-path").textContent = s.config_path;
-  if (!editing) fillForm(s.config);
-  if (s.config_warning) $("cfg-msg").textContent = s.config_warning;
-}
-
-function renderProc(kind, p) {
-  const st = $(`${kind}-state`);
-  st.textContent = p.running ? `en marcha · PID ${p.pid} · ${fmtUptime(p.uptime_secs)}` : p.last_exit ? `detenido · ${p.last_exit}` : "detenido";
-  st.className = "chip " + (p.running ? "on" : "off");
-  $(`${kind}-start`).disabled = p.running || !last?.llama?.dir;
-  $(`${kind}-stop`).disabled = !p.running;
-  $(`${kind}-cmd`).textContent = p.command_line ? `$ ${p.command_line}` : "";
-  const log = $(`${kind}-log`);
-  log.hidden = !p.log.length;
-  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
-  log.textContent = p.log.join("\n");
-  if (atBottom) log.scrollTop = log.scrollHeight;
+  $("llama").innerHTML = s.llama.dir ? `<dt>Carpeta</dt><dd><code>${esc(s.llama.dir)}</code></dd><dt>Programas</dt><dd>${Object.entries(tools).map(([k, v]) => `<span class="pill ${v ? "on" : "off"}">${k}</span>`).join(" ")}</dd>`
+    : `<dt>Estado</dt><dd style="color:var(--bad)">No encontrado. Consulta docs/llama-cpp.md.</dd>`;
 }
 
 function fillForm(c) {
   const f = $("cfg");
-  f.node_name.value = c.node_name;
-  f.panel_port.value = c.panel_port;
-  f.llama_cpp_dir.value = c.llama_cpp_dir || "";
-  f.model_dirs.value = c.model_dirs.join("\n");
-  f.include_ollama.value = String(c.include_ollama);
-  f["llm.port"].value = c.llm.port;
-  f["llm.gpu_layers"].value = c.llm.gpu_layers;
-  f["llm.ctx_size"].value = c.llm.ctx_size;
-  f["llm.rpc_peers"].value = c.llm.rpc_peers.join(", ");
-  f["rpc.bind"].value = c.rpc.bind;
-  f["rpc.port"].value = c.rpc.port;
-  f["rpc.device"].value = c.rpc.device;
-  f["rpc.cache"].value = String(c.rpc.cache);
+  f.node_name.value = c.node_name; f.panel_port.value = c.panel_port; f.llama_cpp_dir.value = c.llama_cpp_dir || "";
+  f.model_dirs.value = c.model_dirs.join("\n"); f.include_ollama.value = String(c.include_ollama);
+  f.discovery.value = String(c.discovery); f.notifications.value = String(c.notifications);
+  f["llm.port"].value = c.llm.port; f["llm.gpu_layers"].value = c.llm.gpu_layers; f["llm.ctx_size"].value = c.llm.ctx_size;
+  f["rpc.port"].value = c.rpc.port; f["rpc.device"].value = c.rpc.device;
 }
-
 function readForm() {
-  const f = $("cfg"), list = (v, sep) => v.split(sep).map((x) => x.trim()).filter(Boolean);
-  return {
-    node_name: f.node_name.value.trim(),
-    panel_port: +f.panel_port.value,
-    llama_cpp_dir: f.llama_cpp_dir.value.trim() || null,
-    model_dirs: list(f.model_dirs.value, /\r?\n/),
-    include_ollama: f.include_ollama.value === "true",
-    llm: { port: +f["llm.port"].value, gpu_layers: +f["llm.gpu_layers"].value, ctx_size: +f["llm.ctx_size"].value, rpc_peers: list(f["llm.rpc_peers"].value, ",") },
-    rpc: { bind: f["rpc.bind"].value.trim(), port: +f["rpc.port"].value, device: f["rpc.device"].value.trim(), cache: f["rpc.cache"].value === "true" },
-  };
+  const f = $("cfg"), c = last.config;
+  return { ...c, node_name: f.node_name.value.trim(), panel_port: +f.panel_port.value, llama_cpp_dir: f.llama_cpp_dir.value.trim() || null,
+    model_dirs: f.model_dirs.value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean), include_ollama: f.include_ollama.value === "true",
+    discovery: f.discovery.value === "true", notifications: f.notifications.value === "true",
+    llm: { ...c.llm, port: +f["llm.port"].value, gpu_layers: +f["llm.gpu_layers"].value, ctx_size: +f["llm.ctx_size"].value },
+    rpc: { ...c.rpc, port: +f["rpc.port"].value, device: f["rpc.device"].value.trim() } };
 }
 
-async function loadModels() {
-  const sel = $("model"), prev = sel.value;
-  try {
-    const models = await api("GET", "/api/models");
-    sel.innerHTML = models.length
-      ? models.map((m) => `<option value="${esc(m.path)}">${esc(m.name)} — ${gib(m.size_bytes)}${m.source === "ollama" ? " (Ollama)" : ""}</option>`).join("")
-      : '<option value="">No se encontraron modelos .gguf</option>';
-    if (prev) sel.value = prev;
-    modelsLoaded = true;
-  } catch (e) { toast("Modelos: " + e.message); }
+function render(s) {
+  last = s;
+  document.title = `Clúster UAC · ${s.node_name}`;
+  $("title").textContent = s.node_name; $("dot").className = "dot";
+  $("subtitle").textContent = `activo desde hace ${ago(s.uptime_secs)}`;
+  $("scan-icon").className = s.discovery.scanning ? "spin" : "";
+  if (!pressed) when("map", [s.peers.map((p) => [p.id, p.name, p.gpu, p.vram_bytes, p.online, p.rpc, p.in_use, p.rpc_latency_ms, p.rpc_reachable]), s.self, s.node_name, s.llm.running, s.llm_split, s.discovery], () => renderMap(s));
+  if (!pressed) when("peers", [s.peers.map((p) => ({ ...p, seen_secs_ago: p.online ? 0 : Math.floor((p.seen_secs_ago || 0) / 30) })), s.llm.running, s.llm_split], () => renderPeers(s));
+  when("events", [s.events.length && s.events[s.events.length - 1].id, Math.floor(Date.now() / 30000)], () => renderEvents(s));
+  when("fitdeps", [s.peers.map((p) => [p.id, p.in_use, p.online]), s.self.usable_bytes], () => loadModels());
+  when("bind", [s.addresses, s.config.rpc.bind], () => renderBind(s));
+  when("machine", [s.report, s.llama], () => renderMachine(s));
+  renderProcs(s);
+  $("cfg-path").textContent = s.config_path;
+  if (!editing) when("cfg", s.config, () => fillForm(s.config));
 }
 
 async function refresh() {
   try { render(await api("GET", "/api/status")); }
-  catch (e) { $("dot").style.background = "var(--bad)"; $("subtitle").textContent = "sin conexión con el nodo"; }
+  catch { $("dot").className = "dot bad"; $("subtitle").textContent = "sin conexión con el programa"; }
 }
-
 async function act(btn, fn) {
-  btn.disabled = true;
-  try { await fn(); } catch (e) { toast(e.message, 6000); } finally { await refresh(); }
+  if (btn) btn.disabled = true;
+  try { await fn(); } catch (e) { toast(e.message, 7000); } finally { await refresh(); }
 }
 
-$("reprobe").onclick = (e) => act(e.target, async () => { await api("POST", "/api/probe"); toast("Hardware sondeado de nuevo"); });
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-act]");
+  if (b) return act(b, async () => {
+    await api("POST", `/api/peers/${b.dataset.act}`, { addr: b.dataset.addr });
+    toast(b.dataset.act === "use" ? "Su GPU se usará la próxima vez que inicies un modelo que no quepa aquí." : "Ya no se usará su GPU.");
+    if (last?.llm.running) toast("El modelo en marcha no cambia hasta que lo detengas y lo inicies de nuevo.");
+  });
+  const node = e.target.closest("[data-peer]");
+  if (node) {
+    const row = $("peer-" + node.dataset.peer);
+    if (row) { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
+  }
+});
+$("scan").onclick = (e) => act(null, async () => { await api("POST", "/api/scan"); toast("Buscando equipos en la red…", 2500); });
+$("model").onchange = renderFit;
 $("llm-start").onclick = (e) => act(e.target, async () => {
-  const model_path = $("model").value;
-  if (!model_path) throw new Error("Elige un modelo");
-  await api("POST", "/api/llm/start", { model_path });
-  toast("Cargando el modelo… el chat estará listo cuando el log diga «server is listening»", 6000);
+  const m = models.find((x) => x.path === $("model").value);
+  if (!m) throw new Error("Elige un modelo");
+  if (m.fit === "too_big" && !confirm("Este modelo no cabe en la memoria de GPU disponible. Irá muy lento o fallará al cargar. ¿Iniciarlo de todos modos?")) return;
+  const r = await api("POST", "/api/llm/start", { model_path: m.path });
+  toast(r.split ? "Cargando el modelo repartido entre equipos… puede tardar." : "Cargando el modelo… el chat estará listo en unos segundos.", 6000);
+  if (r.peers_skipped) toast(`${r.peers_skipped} equipo(s) en uso no responden y se dejaron fuera.`, 7000);
 });
 $("llm-stop").onclick = (e) => act(e.target, () => api("POST", "/api/llm/stop"));
 $("rpc-start").onclick = (e) => act(e.target, async () => {
-  const lan = last && !["127.0.0.1", "::1"].includes(last.config.rpc.bind);
-  if (lan && !confirm(`El servidor RPC escuchará en ${last.config.rpc.bind} sin autenticación. Cualquiera en tu red podría usar esta GPU. ¿Continuar?`)) return;
-  await api("POST", "/api/rpc/start", { allow_lan: !!lan });
+  const bind = $("bind").value, lan = bind !== "127.0.0.1";
+  if (lan && !confirm(`Vas a compartir la GPU en ${bind} sin contraseña. Cualquiera en esa red podrá usarla mientras esté activo. ¿Continuar?`)) return;
+  await api("POST", "/api/rpc/start", { bind, allow_lan: lan });
 });
 $("rpc-stop").onclick = (e) => act(e.target, () => api("POST", "/api/rpc/stop"));
-
+$("reprobe").onclick = (e) => act(e.target, async () => { await api("POST", "/api/probe"); toast("Hardware sondeado de nuevo"); });
+$("add-peer").addEventListener("submit", (e) => {
+  e.preventDefault();
+  act(null, async () => { const r = await api("POST", "/api/peers/add", { addr: $("add-addr").value }); $("add-addr").value = ""; toast(`Equipo añadido${r.latency_ms != null ? ` (${r.latency_ms} ms)` : ""}`); });
+});
 const form = $("cfg");
 form.addEventListener("focusin", () => (editing = true));
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
     const r = await api("PUT", "/api/config", readForm());
-    $("cfg-msg").textContent = r.restart_needed ? "Guardado. Reinicia el programa para cambiar el puerto del panel." : "Guardado.";
-    editing = false; modelsLoaded = false; await loadModels();
-  } catch (err) { $("cfg-msg").textContent = ""; toast(err.message, 6000); }
+    $("cfg-msg").textContent = r.restart_needed ? "Guardado. Cierra y vuelve a abrir el programa para aplicar el cambio." : "Guardado.";
+    editing = false; await loadModels();
+  } catch (err) { $("cfg-msg").textContent = ""; toast(err.message, 7000); }
   refresh();
 });
 
-refresh().then(loadModels);
+refresh();
 setInterval(refresh, 2000);
 </script>
 </body>

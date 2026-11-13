@@ -183,6 +183,14 @@ impl Procs {
         Ok(())
     }
 
+    pub fn is_running(&self, kind: Kind) -> bool {
+        let Ok(mut slot) = self.slot(kind).lock() else {
+            return false;
+        };
+        slot.reap();
+        slot.running.is_some()
+    }
+
     pub fn stop_all(&self) {
         self.stop(Kind::Rpc).ok();
         self.stop(Kind::Llm).ok();
