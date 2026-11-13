@@ -137,6 +137,7 @@ td { padding: 4px 6px; border-bottom: 1px solid var(--line); } td.num { text-ali
       <div id="share-info"></div>
       <div class="row" style="margin-top:10px">
         <button class="primary" id="llm-start">Iniciar</button>
+        <button class="primary" id="llm-cluster" hidden>Iniciar uniendo la memoria del clúster</button>
         <button id="llm-stop">Detener</button>
         <a id="chat-link" href="#" target="_blank" rel="noopener" hidden><button class="primary" type="button">Abrir chat ↗</button></a>
       </div>
@@ -151,6 +152,7 @@ td { padding: 4px 6px; border-bottom: 1px solid var(--line); } td.num { text-ali
         <button class="primary" id="rpc-start">Compartir mi GPU</button>
         <button id="rpc-stop">Dejar de compartir</button>
       </div>
+      <label style="margin:12px 0 0;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="rpc-auto" style="width:auto;margin-top:5px"><span style="color:var(--text);font-size:15px;margin:0">Compartir mi GPU sola al abrir el programa<br><small class="muted">Así otro equipo puede unir su memoria con la mía con un solo botón, sin tocar este panel. Usa el cable si hay uno; si no, el Wi-Fi.</small></span></label>
       <div id="rpc-note"></div>
       <details><summary>Registro del servidor RPC</summary><div class="muted" id="rpc-cmd" style="font-size:12.5px;margin-top:6px"></div><pre id="rpc-log"></pre></details>
     </section>
@@ -336,8 +338,15 @@ function renderModels() {
 function renderFit() {
   const m = models.find((x) => x.path === $("model").value), s = last;
   if (!m || !s) { $("fit").innerHTML = ""; return; }
+  const btn = $("llm-cluster"), avail = s.peers.filter((p) => p.online && p.rpc && p.usable_bytes > 0).length;
+  btn.hidden = !m || m.fit === "local" || m.cluster_fit === "unknown" || !avail;
+  btn.disabled = !!s.llm.running || !s.llama.dir || m?.cluster_fit !== "split";
   const inUse = s.peers.filter((p) => p.in_use && p.online), using = inUse.length;
   const need = gib(m.required_bytes), have = gib(s.self.usable_bytes), total = gib(s.self.usable_bytes + inUse.reduce((a, p) => a + p.usable_bytes, 0));
+  const clusterNote = m.fit !== "local" && avail
+    ? (m.cluster_fit === "split" ? `<p class="note accent">Uniendo la memoria de ${m.cluster_peers} equipo${m.cluster_peers > 1 ? "s" : ""} del clúster sí cabe. Pulsa «Iniciar uniendo la memoria del clúster»: elige solo los equipos necesarios.</p>`
+      : m.cluster_fit === "too_big" ? `<p class="note bad">Ni uniendo la memoria de los ${avail + 1} equipos que ofrecen su GPU cabe este modelo.</p>` : "") : "";
+  if (clusterNote && m.fit !== "split") { $("fit").innerHTML = clusterNote; return; }
   $("fit").innerHTML = m.fit === "local" ? `<p class="note ok">Cabe en la GPU de este equipo (necesita unos ${need} de ${have}). Se ejecuta solo aquí, que es lo más rápido.</p>`
     : m.fit === "split" ? `<p class="note accent">No cabe en esta GPU (necesita unos ${need}). Se repartirá entre este equipo y ${using} más. Será más lento que en una sola GPU.</p>`
     : m.fit === "too_big" ? `<p class="note bad">Necesita unos ${need} y ${using ? `entre los ${using + 1} equipos hay ${total}` : `aquí hay ${have}`} utilizables. Conecta otro equipo y usa su GPU, o elige un modelo más pequeño.</p>` : "";
@@ -352,6 +361,7 @@ function renderProcs(s) {
   $("llm-state").className = "pill " + (llm.running ? "on" : "");
   $("llm-start").disabled = llm.running || !hasLlama; $("llm-stop").disabled = !llm.running;
   $("share").disabled = llm.running; $("chat-bind").disabled = llm.running;
+  $("rpc-auto").checked = !!s.config.rpc.auto;
   if (llm.running) $("share").checked = !!s.self.chat;
   $("share-opts").hidden = !$("share").checked;
   when("share-info", [s.self.chat, s.config.llm.api_key, llm.running], () => {
@@ -428,7 +438,7 @@ function render(s) {
   if (!pressed) when("map", [s.peers.map((p) => [p.id, p.name, p.gpu, p.vram_bytes, p.online, p.rpc, p.in_use, p.rpc_latency_ms, p.rpc_reachable]), s.self, s.node_name, s.llm.running, s.llm_split, s.discovery], () => renderMap(s));
   if (!pressed) when("peers", [s.peers.map((p) => ({ ...p, seen_secs_ago: p.online ? 0 : Math.floor((p.seen_secs_ago || 0) / 30) })), s.llm.running, s.llm_split], () => renderPeers(s));
   when("events", [s.events.length && s.events[s.events.length - 1].id, Math.floor(Date.now() / 30000)], () => renderEvents(s));
-  when("fitdeps", [s.peers.map((p) => [p.id, p.in_use, p.online]), s.self.usable_bytes], () => loadModels());
+  when("fitdeps", [s.peers.map((p) => [p.id, p.in_use, p.online, p.rpc, p.usable_bytes]), s.self.usable_bytes, s.llama.dir], () => loadModels());
   when("bind", [s.addresses, s.config.rpc.bind], () => renderBind(s));
   when("machine", [s.report, s.llama], () => renderMachine(s));
   renderProcs(s);
@@ -477,6 +487,7 @@ document.addEventListener("click", (e) => {
     if (row) { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
   }
 });
+$("chat-link").addEventListener("click", () => { if (last?.self.chat) navigator.clipboard?.writeText(last.config.llm.api_key).then(() => toast("Clave copiada: pégala en Ajustes del chat.", 6000), () => {}); });
 $("scan").onclick = (e) => act(null, async () => { await api("POST", "/api/scan"); toast("Buscando equipos en la red…", 2500); });
 $("model").onchange = renderFit;
 $("share").onchange = () => { $("share-opts").hidden = !$("share").checked; sigs["share-info"] = null; renderProcs(last); };
@@ -493,6 +504,19 @@ $("llm-start").onclick = (e) => act(e.target, async () => {
   toast(r.split ? "Cargando el modelo repartido entre equipos… puede tardar." : "Cargando el modelo… el chat estará listo en unos segundos.", 6000);
   if (r.peers_skipped) toast(`${r.peers_skipped} equipo(s) en uso no responden y se dejaron fuera.`, 7000);
 });
+$("llm-cluster").onclick = (e) => act(e.target, async () => {
+  const m = models.find((x) => x.path === $("model").value);
+  if (!m) throw new Error("Elige un modelo");
+  const share = $("share").checked, bind = $("chat-bind").value;
+  if (share && !confirm(`Vas a abrir el chat a tu red en ${bind}. Quien tenga la clave podrá usar el modelo y tu GPU mientras esté en marcha. ¿Continuar?`)) return;
+  const r = await api("POST", "/api/llm/start", { model_path: m.path, use_cluster: true, ...(share ? { share_bind: bind, allow_lan: true } : {}) });
+  toast(`Memoria unida con ${r.peers_used.join(" y ")}. Cargando el modelo repartido… puede tardar.`, 9000);
+});
+$("rpc-auto").onchange = async (e) => {
+  const on = e.target.checked;
+  if (on && !confirm("Al abrir el programa se compartirá tu GPU con tu red local, sin contraseña, hasta que lo cierres. Cualquiera en esa red podría usarla. ¿Activarlo?")) { e.target.checked = false; return; }
+  act(null, async () => { await api("PUT", "/api/config", { ...last.config, rpc: { ...last.config.rpc, auto: on } }); toast(on ? "Se compartirá sola la próxima vez que abras el programa." : "Ya no se compartirá sola al abrir."); });
+};
 $("llm-stop").onclick = (e) => act(e.target, () => api("POST", "/api/llm/stop"));
 $("rpc-start").onclick = (e) => act(e.target, async () => {
   const bind = $("bind").value, lan = bind !== "127.0.0.1";

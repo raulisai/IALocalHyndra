@@ -199,6 +199,17 @@ pub fn local_ipv4() -> Vec<LocalAddr> {
     found
 }
 
+/// IP de este equipo por la que compartir la GPU sin preguntar: la de una
+/// conexión con cable si la hay, y si no la de Wi-Fi.
+pub fn preferred_lan_ip(local: &[LocalAddr]) -> Option<Ipv4Addr> {
+    local
+        .iter()
+        .find(|l| !is_wifi_name(&l.name) && !l.ip.is_link_local())
+        .or_else(|| local.iter().find(|l| !is_wifi_name(&l.name)))
+        .or_else(|| local.first())
+        .map(|l| l.ip)
+}
+
 fn same_subnet(a: Ipv4Addr, b: Ipv4Addr, mask: Ipv4Addr) -> bool {
     u32::from(a) & u32::from(mask) == u32::from(b) & u32::from(mask)
 }
@@ -770,6 +781,32 @@ mod tests {
             Some("127.0.0.1".parse().unwrap())
         );
         assert_eq!(pick_addr(&[], &local), None);
+    }
+
+    #[test]
+    fn preferred_ip_is_cable_then_wifi() {
+        let iface = |name: &str, ip: &str| LocalAddr {
+            name: name.to_string(),
+            ip: ip.parse().unwrap(),
+            netmask: "255.255.255.0".parse().unwrap(),
+        };
+        let wifi = iface("Wi-Fi", "192.168.1.65");
+        let cable = iface("Ethernet", "169.254.10.1");
+        let lan_cable = iface("Ethernet 2", "192.168.50.2");
+        assert_eq!(
+            preferred_lan_ip(&[wifi.clone(), cable.clone()]),
+            Some("169.254.10.1".parse().unwrap())
+        );
+        // Una red con DHCP gana a la dirección de enlace local.
+        assert_eq!(
+            preferred_lan_ip(&[wifi.clone(), cable, lan_cable]),
+            Some("192.168.50.2".parse().unwrap())
+        );
+        assert_eq!(
+            preferred_lan_ip(&[wifi]),
+            Some("192.168.1.65".parse().unwrap())
+        );
+        assert_eq!(preferred_lan_ip(&[]), None);
     }
 
     #[test]

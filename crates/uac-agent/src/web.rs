@@ -45,6 +45,9 @@ pub struct AppState {
     pub llm_split: AtomicBool,
     /// Dirección en la que el chat está abierto a la red, si lo está.
     pub llm_share: RwLock<Option<SocketAddr>>,
+    /// Equipos elegidos a mano antes de que una petición de clúster los
+    /// sustituyera; se restauran al detener el modelo.
+    pub llm_prev_peers: RwLock<Option<Vec<String>>>,
     pub node_id: String,
     pub hostname: String,
     pub started: Instant,
@@ -406,6 +409,45 @@ pub fn required_bytes(model_size: u64) -> u64 {
     model_size + model_size / 7 + 512 * MIB
 }
 
+/// Un equipo que ofrece su GPU por RPC y responde ahora.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Candidate {
+    pub addr: String,
+    pub name: String,
+    pub usable_bytes: u64,
+}
+
+/// Elige con cuántos equipos unir la memoria para que quepa `required`.
+///
+/// Usa los menos posibles, empezando por los de más memoria: cada equipo extra
+/// añade un salto de red a cada token. Devuelve los equipos elegidos o, si ni
+/// con todos cabe, cuántos bytes faltan.
+pub fn pick_peers(
+    required: u64,
+    local_usable: u64,
+    candidates: &[Candidate],
+) -> Result<Vec<Candidate>, u64> {
+    if required <= local_usable {
+        return Ok(Vec::new());
+    }
+    let mut sorted: Vec<&Candidate> = candidates.iter().filter(|c| c.usable_bytes > 0).collect();
+    sorted.sort_by(|a, b| {
+        b.usable_bytes
+            .cmp(&a.usable_bytes)
+            .then(a.addr.cmp(&b.addr))
+    });
+    let mut total = local_usable;
+    let mut chosen = Vec::new();
+    for c in sorted {
+        chosen.push(c.clone());
+        total += c.usable_bytes;
+        if total >= required {
+            return Ok(chosen);
+        }
+    }
+    Err(required - total)
+}
+
 /// Dónde cabría un modelo: `local`, `split` (repartido con las GPU en uso),
 /// `too_big` o `unknown` si aún no se conoce la GPU de este equipo.
 pub fn fit_kind(required: u64, local_usable: Option<u64>, remote_usable: u64) -> &'static str {
@@ -423,6 +465,27 @@ struct ModelView {
     model: Model,
     required_bytes: u64,
     fit: &'static str,
+    /// Dónde cabría usando TODOS los equipos conectados que ofrecen su GPU.
+    cluster_fit: &'static str,
+    /// Cuántos equipos haría falta unir para que quepa (0 = ninguno).
+    cluster_peers: usize,
+}
+
+/// Equipos que pueden prestar su GPU ahora: conectados, con RPC anunciado y
+/// sin haber fallado el último sondeo. Los añadidos a mano no entran porque no
+/// se conoce su memoria.
+pub fn cluster_candidates(views: &[PeerView]) -> Vec<Candidate> {
+    views
+        .iter()
+        .filter(|p| p.online && p.rpc_reachable != Some(false) && p.usable_bytes > 0)
+        .filter_map(|p| {
+            Some(Candidate {
+                addr: p.rpc.clone()?,
+                name: p.name.clone(),
+                usable_bytes: p.usable_bytes,
+            })
+        })
+        .collect()
 }
 
 async fn list_models(State(state): State<Shared>) -> Result<Json<Vec<ModelView>>, ApiError> {
@@ -433,18 +496,26 @@ async fn list_models(State(state): State<Shared>) -> Result<Json<Vec<ModelView>>
         .map_err(|_| internal("falló la búsqueda de modelos"))?;
     let advert = state.advert();
     let local = (advert.vram_bytes > 0).then(|| usable_for(advert.vram_bytes, &advert.memory));
-    let remote: u64 = peer_views(&state.discovery.snapshot(), &cfg)
+    let views = peer_views(&state.discovery.snapshot(), &cfg);
+    let remote: u64 = views
         .iter()
         .filter(|p| p.in_use && p.online)
         .map(|p| p.usable_bytes)
         .sum();
+    let candidates = cluster_candidates(&views);
+    let cluster_total: u64 = candidates.iter().map(|c| c.usable_bytes).sum();
     Ok(Json(
         found
             .into_iter()
             .map(|model| {
                 let required = required_bytes(model.size_bytes);
+                let cluster_peers = local
+                    .and_then(|l| pick_peers(required, l, &candidates).ok())
+                    .map_or(0, |chosen| chosen.len());
                 ModelView {
                     fit: fit_kind(required, local, remote),
+                    cluster_fit: fit_kind(required, local, cluster_total),
+                    cluster_peers,
                     required_bytes: required,
                     model,
                 }
@@ -619,6 +690,10 @@ struct LlmStart {
     /// Confirmación explícita para abrir el chat a la red local.
     #[serde(default)]
     allow_lan: bool,
+    /// Unir la memoria de los equipos conectados que ofrecen su GPU, con los
+    /// mínimos necesarios, sin tener que elegirlos uno por uno.
+    #[serde(default)]
+    use_cluster: bool,
 }
 
 /// `peers`: servidores RPC entre los que repartir el modelo (vacío = solo aquí).
@@ -670,8 +745,48 @@ async fn llm_start(
     let fits_here = fit_kind(required_bytes(model.size_bytes), local, 0) == "local";
     // Solo se reparte con los equipos que responden ahora: uno apagado haría
     // fallar la carga entera.
+    let mut cluster_names: Vec<String> = Vec::new();
     let peers = if fits_here {
         Vec::new()
+    } else if body.use_cluster {
+        // Una sola petición: se eligen aquí los equipos, se comprueba que
+        // responden y se guardan como «en uso» para que el panel los refleje.
+        let required = required_bytes(model.size_bytes);
+        let local_usable = local.unwrap_or(0);
+        let views = peer_views(&state.discovery.snapshot(), &cfg);
+        let probed = tokio::task::spawn_blocking(move || {
+            cluster_candidates(&views)
+                .into_iter()
+                .filter(|c| {
+                    c.addr
+                        .parse::<SocketAddr>()
+                        .is_ok_and(|a| discovery::probe(a).reachable)
+                })
+                .collect::<Vec<Candidate>>()
+        })
+        .await
+        .map_err(|_| internal("falló la comprobación de equipos"))?;
+        let chosen = pick_peers(required, local_usable, &probed).map_err(|missing| {
+            let gib = missing as f64 / (1u64 << 30) as f64;
+            bad(if probed.is_empty() {
+                format!(
+                    "este modelo no cabe en esta GPU y ningún otro equipo ofrece la suya ahora. Abre el programa en otro equipo y activa «Compartir mi GPU»; faltarían unos {gib:.1} GiB."
+                )
+            } else {
+                format!(
+                    "no cabe ni uniendo la memoria de {} equipos: faltan unos {gib:.1} GiB. Conecta otro equipo o elige un modelo más pequeño.",
+                    probed.len() + 1
+                )
+            })
+        })?;
+        let addrs: Vec<String> = chosen.iter().map(|c| c.addr.clone()).collect();
+        cluster_names = chosen.iter().map(|c| c.name.clone()).collect();
+        let saved = addrs.clone();
+        if let Ok(mut prev) = state.llm_prev_peers.write() {
+            prev.get_or_insert_with(|| cfg.llm.rpc_peers.clone());
+        }
+        update_config(&state, move |c| c.llm.rpc_peers = saved)?;
+        addrs
     } else {
         let candidates = cfg.llm.rpc_peers.clone();
         tokio::task::spawn_blocking(move || {
@@ -687,7 +802,7 @@ async fn llm_start(
         .map_err(|_| internal("falló la comprobación de equipos"))?
     };
     let split = !peers.is_empty();
-    let skipped = if fits_here {
+    let skipped = if fits_here || body.use_cluster {
         0
     } else {
         cfg.llm.rpc_peers.len() - peers.len()
@@ -747,6 +862,7 @@ async fn llm_start(
     Ok(Json(json!({
         "ok": true,
         "split": split,
+        "peers_used": cluster_names,
         "peers_skipped": skipped,
         "chat_url": format!("http://127.0.0.1:{}/", cfg.llm.port),
     })))
@@ -765,6 +881,14 @@ async fn rotate_key(State(state): State<Shared>) -> Result<Json<Value>, ApiError
 
 async fn llm_stop(State(state): State<Shared>) -> Result<Json<Value>, ApiError> {
     state.procs.stop(Kind::Llm)?;
+    let prev = state
+        .llm_prev_peers
+        .write()
+        .ok()
+        .and_then(|mut slot| slot.take());
+    if let Some(prev) = prev {
+        update_config(&state, move |c| c.llm.rpc_peers = prev)?;
+    }
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -812,6 +936,39 @@ mod tests {
         assert!(
             args.windows(2)
                 .any(|w| w == ["--rpc", "192.168.1.20:50052"])
+        );
+    }
+
+    #[test]
+    fn unites_the_fewest_peers_needed() {
+        let gib = 1u64 << 30;
+        let peer = |addr: &str, gib_usable: u64| Candidate {
+            addr: addr.to_string(),
+            name: addr.to_string(),
+            usable_bytes: gib_usable * gib,
+        };
+        let peers = [peer("a:1", 7), peer("b:1", 15), peer("c:1", 7)];
+        // Cabe aquí: no se une nada.
+        assert_eq!(pick_peers(5 * gib, 7 * gib, &peers), Ok(vec![]));
+        // Con el equipo grande basta uno.
+        let chosen = pick_peers(18 * gib, 7 * gib, &peers).unwrap();
+        assert_eq!(
+            chosen.iter().map(|c| c.addr.as_str()).collect::<Vec<_>>(),
+            ["b:1"]
+        );
+        // Hacen falta dos, y se eligen los de más memoria primero.
+        let chosen = pick_peers(28 * gib, 7 * gib, &peers).unwrap();
+        assert_eq!(
+            chosen.iter().map(|c| c.addr.as_str()).collect::<Vec<_>>(),
+            ["b:1", "a:1"]
+        );
+        // Ni con todos cabe: se dice cuánto falta.
+        assert_eq!(pick_peers(40 * gib, 7 * gib, &peers), Err(4 * gib));
+        assert_eq!(pick_peers(gib, 0, &[]), Err(gib));
+        // Un equipo sin memoria conocida no cuenta.
+        assert_eq!(
+            pick_peers(10 * gib, 7 * gib, &[peer("z:1", 0)]),
+            Err(3 * gib)
         );
     }
 
