@@ -118,7 +118,15 @@ impl Procs {
         }
     }
 
-    pub fn start(&self, kind: Kind, exe: &Path, args: &[String]) -> anyhow::Result<()> {
+    /// `envs`: variables de entorno extra. Sirven para pasar secretos sin que
+    /// aparezcan en la línea de comandos del proceso.
+    pub fn start(
+        &self,
+        kind: Kind,
+        exe: &Path,
+        args: &[String],
+        envs: &[(&str, &str)],
+    ) -> anyhow::Result<()> {
         if !exe.is_file() {
             bail!("no se encontró {}", exe.display());
         }
@@ -136,7 +144,8 @@ impl Procs {
             .args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stderr(Stdio::piped())
+            .envs(envs.iter().copied());
         if let Some(dir) = exe.parent() {
             command.current_dir(dir);
         }

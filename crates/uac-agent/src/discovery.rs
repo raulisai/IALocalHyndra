@@ -37,8 +37,20 @@ pub struct Advert {
     pub backend: String,
     /// Servidor RPC de llama.cpp alcanzable desde la red, si está en marcha.
     pub rpc: Option<SocketAddr>,
+    /// Chat (llama-server) abierto a la red con clave, si lo hay. La clave
+    /// nunca se anuncia: se la da el usuario a quien quiera usarlo.
+    pub chat: Option<SocketAddr>,
     /// Modelo cargado ahora mismo, o vacío.
     pub model: String,
+}
+
+/// Dirección anunciada por otro equipo. Es un dato no confiable: solo se
+/// acepta si es de red local, para que un anuncio falso no nos haga conectar
+/// o abrir una dirección de Internet.
+fn lan_addr(value: Option<String>) -> Option<SocketAddr> {
+    value
+        .and_then(|v| v.parse::<SocketAddr>().ok())
+        .filter(|a| crate::config::is_lan_ip(a.ip()))
 }
 
 fn clip(text: &str) -> String {
@@ -58,6 +70,7 @@ impl Advert {
             ("mem", clip(&self.memory)),
             ("backend", clip(&self.backend)),
             ("rpc", self.rpc.map(|a| a.to_string()).unwrap_or_default()),
+            ("chat", self.chat.map(|a| a.to_string()).unwrap_or_default()),
             ("model", clip(&self.model)),
         ]
     }
@@ -79,7 +92,8 @@ impl Advert {
             vram_bytes: get("vram").and_then(|v| v.parse().ok()).unwrap_or(0),
             memory: text("mem"),
             backend: text("backend"),
-            rpc: get("rpc").and_then(|v| v.parse().ok()),
+            rpc: lan_addr(get("rpc")),
+            chat: lan_addr(get("chat")),
             model: text("model"),
         })
     }
@@ -615,6 +629,7 @@ mod tests {
             memory: "dedicated".to_string(),
             backend: "vulkan".to_string(),
             rpc: Some("192.168.1.10:50052".parse().unwrap()),
+            chat: Some("192.168.1.10:8080".parse().unwrap()),
             model: "qwen2.5:7b".to_string(),
         }
     }
@@ -663,6 +678,15 @@ mod tests {
         .unwrap();
         assert_eq!(odd.vram_bytes, 0);
         assert_eq!(odd.rpc, None);
+        // Una dirección pública anunciada se descarta.
+        let public = Advert::from_txt(|k| match k {
+            "proto" => Some("1".to_string()),
+            "id" => Some("x".to_string()),
+            "rpc" | "chat" => Some("8.8.8.8:80".to_string()),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!((public.rpc, public.chat), (None, None));
         assert_eq!(odd.name.chars().count(), MAX_FIELD_CHARS);
     }
 

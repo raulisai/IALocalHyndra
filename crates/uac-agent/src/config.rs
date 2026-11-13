@@ -48,6 +48,8 @@ pub struct LlmConfig {
     pub port: u16,
     pub gpu_layers: u32,
     pub ctx_size: u32,
+    /// Clave para usar este chat desde otros equipos. Se genera sola al compartir.
+    pub api_key: String,
     /// Servidores RPC de otros nodos (`ip:puerto`) entre los que repartir el modelo.
     pub rpc_peers: Vec<String>,
 }
@@ -92,6 +94,7 @@ impl Default for LlmConfig {
             port: 8080,
             gpu_layers: 99,
             ctx_size: 4096,
+            api_key: String::new(),
             rpc_peers: Vec::new(),
         }
     }
@@ -173,6 +176,13 @@ pub fn parse_lan_socket(text: &str) -> anyhow::Result<SocketAddr> {
         bail!("el puerto no puede ser 0");
     }
     Ok(addr)
+}
+
+/// Clave aleatoria de 128 bits en hexadecimal.
+pub fn new_api_key() -> anyhow::Result<String> {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes).map_err(|e| anyhow::anyhow!("sin fuente de aleatoriedad: {e}"))?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 
 pub fn home_dir() -> Option<PathBuf> {
@@ -328,6 +338,14 @@ mod tests {
         let mut cfg = Config::default();
         cfg.rpc.bind = "0.0.0.0".to_string();
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn api_keys_are_random_hex() {
+        let (a, b) = (new_api_key().unwrap(), new_api_key().unwrap());
+        assert_eq!(a.len(), 32);
+        assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_ne!(a, b);
     }
 
     #[test]

@@ -43,6 +43,8 @@ pub struct AppState {
     pub llm_model: RwLock<Option<String>>,
     /// El modelo en marcha está repartido con otros equipos.
     pub llm_split: AtomicBool,
+    /// Dirección en la que el chat está abierto a la red, si lo está.
+    pub llm_share: RwLock<Option<SocketAddr>>,
     pub node_id: String,
     pub hostname: String,
     pub started: Instant,
@@ -104,6 +106,11 @@ impl AppState {
         } else {
             String::new()
         };
+        let chat = if self.procs.is_running(Kind::Llm) {
+            self.llm_share.read().ok().and_then(|s| *s)
+        } else {
+            None
+        };
         Advert {
             id: self.node_id.clone(),
             name: if cfg.node_name.is_empty() {
@@ -133,6 +140,7 @@ impl AppState {
                 .map(|b| format!("{:?}", b.backend).to_lowercase())
                 .unwrap_or_default(),
             rpc,
+            chat,
             model,
         }
     }
@@ -178,6 +186,7 @@ pub fn router(state: Shared) -> Router {
         .route("/api/rpc/stop", post(rpc_stop))
         .route("/api/llm/start", post(llm_start))
         .route("/api/llm/stop", post(llm_stop))
+        .route("/api/llm/rotate-key", post(rotate_key))
         .layer(middleware::from_fn(guard))
         .with_state(state)
 }
@@ -262,6 +271,8 @@ pub struct PeerView {
     pub usable_bytes: u64,
     pub backend: String,
     pub rpc: Option<String>,
+    /// Chat de ese equipo abierto a la red (necesita su clave).
+    pub chat: Option<String>,
     pub model: String,
     pub addr: Option<String>,
     pub online: bool,
@@ -297,6 +308,7 @@ pub fn peer_views(snap: &Snapshot, cfg: &Config) -> Vec<PeerView> {
                 usable_bytes: usable_for(p.advert.vram_bytes, &p.advert.memory),
                 backend: p.advert.backend.clone(),
                 rpc: p.advert.rpc.map(|a| a.to_string()),
+                chat: p.advert.chat.map(|a| a.to_string()),
                 model: p.advert.model.clone(),
                 addr: p.addr.map(|a| a.to_string()),
                 online: p.online,
@@ -322,6 +334,7 @@ pub fn peer_views(snap: &Snapshot, cfg: &Config) -> Vec<PeerView> {
             usable_bytes: 0,
             backend: String::new(),
             rpc: Some(addr.to_string()),
+            chat: None,
             model: String::new(),
             addr: Some(addr.ip().to_string()),
             online: probe.is_some_and(|pr| pr.reachable),
@@ -369,6 +382,7 @@ async fn status(State(state): State<Shared>) -> Result<Json<Value>, ApiError> {
             "usable_bytes": usable_for(advert.vram_bytes, &advert.memory),
             "backend": advert.backend,
             "sharing": advert.rpc.map(|a| a.to_string()),
+            "chat": advert.chat.map(|a| a.to_string()),
             "model": advert.model,
         },
         "addresses": discovery::local_ipv4(),
@@ -587,7 +601,7 @@ async fn rpc_start(
         ));
     }
     let exe = llama_exe(&cfg, "ggml-rpc-server")?;
-    state.procs.start(Kind::Rpc, &exe, &rpc_args(&cfg))?;
+    state.procs.start(Kind::Rpc, &exe, &rpc_args(&cfg), &[])?;
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -599,15 +613,28 @@ async fn rpc_stop(State(state): State<Shared>) -> Result<Json<Value>, ApiError> 
 #[derive(Deserialize)]
 struct LlmStart {
     model_path: PathBuf,
+    /// IP de este equipo por la que abrir el chat a la red. Sin ella, solo local.
+    #[serde(default)]
+    share_bind: Option<String>,
+    /// Confirmación explícita para abrir el chat a la red local.
+    #[serde(default)]
+    allow_lan: bool,
 }
 
 /// `peers`: servidores RPC entre los que repartir el modelo (vacío = solo aquí).
-pub fn llm_args(cfg: &Config, model: &std::path::Path, peers: &[String]) -> Vec<String> {
+/// `host`: IP en la que escuchar. La clave de acceso no va aquí: se pasa por
+/// la variable `LLAMA_API_KEY` para que no se vea en la lista de procesos.
+pub fn llm_args(
+    cfg: &Config,
+    model: &std::path::Path,
+    peers: &[String],
+    host: IpAddr,
+) -> Vec<String> {
     let mut args = vec![
         "-m".to_string(),
         model.display().to_string(),
         "--host".to_string(),
-        "127.0.0.1".to_string(),
+        host.to_string(),
         "--port".to_string(),
         cfg.llm.port.to_string(),
         "-ngl".to_string(),
@@ -665,10 +692,54 @@ async fn llm_start(
     } else {
         cfg.llm.rpc_peers.len() - peers.len()
     };
+    // Abrir el chat a la red: solo por una IP de este equipo en red local, con
+    // confirmación explícita y siempre con clave.
+    let share = match &body.share_bind {
+        None => None,
+        Some(text) => {
+            let ip: IpAddr = text
+                .trim()
+                .parse()
+                .map_err(|_| bad(format!("«{text}» no es una IP válida")))?;
+            let mine = discovery::local_ipv4();
+            if ip.is_loopback()
+                || !config::is_lan_ip(ip)
+                || !mine.iter().any(|a| IpAddr::V4(a.ip) == ip)
+            {
+                return Err(bad(
+                    "solo se puede compartir el chat por una conexión de red local de este equipo",
+                ));
+            }
+            if !body.allow_lan {
+                return Err(bad(
+                    "confirma que quieres abrir el chat a otros equipos de tu red local",
+                ));
+            }
+            Some(ip)
+        }
+    };
+    let mut cfg = cfg;
+    if share.is_some() && cfg.llm.api_key.is_empty() {
+        let key = config::new_api_key()?;
+        cfg = update_config(&state, |c| c.llm.api_key = key)?;
+    }
+    let host = share.unwrap_or(IpAddr::from([127, 0, 0, 1]));
+    let key = cfg.llm.api_key.clone();
+    let envs: Vec<(&str, &str)> = if share.is_some() {
+        vec![("LLAMA_API_KEY", key.as_str())]
+    } else {
+        Vec::new()
+    };
     let exe = llama_exe(&cfg, "llama-server")?;
-    state
-        .procs
-        .start(Kind::Llm, &exe, &llm_args(&cfg, &body.model_path, &peers))?;
+    state.procs.start(
+        Kind::Llm,
+        &exe,
+        &llm_args(&cfg, &body.model_path, &peers, host),
+        &envs,
+    )?;
+    if let Ok(mut slot) = state.llm_share.write() {
+        *slot = share.map(|ip| SocketAddr::new(ip, cfg.llm.port));
+    }
     state.llm_split.store(split, Ordering::Relaxed);
     if let Ok(mut slot) = state.llm_model.write() {
         *slot = Some(model.name.clone());
@@ -678,6 +749,17 @@ async fn llm_start(
         "split": split,
         "peers_skipped": skipped,
         "chat_url": format!("http://127.0.0.1:{}/", cfg.llm.port),
+    })))
+}
+
+/// Genera una clave nueva. Quien tuviera la anterior pierde el acceso en cuanto
+/// se reinicie el chat.
+async fn rotate_key(State(state): State<Shared>) -> Result<Json<Value>, ApiError> {
+    let key = config::new_api_key()?;
+    update_config(&state, |c| c.llm.api_key = key)?;
+    Ok(Json(json!({
+        "ok": true,
+        "restart_needed": state.procs.is_running(Kind::Llm),
     })))
 }
 
@@ -714,9 +796,17 @@ mod tests {
     fn llm_command_line_with_peers() {
         let mut cfg = Config::default();
         cfg.llm.rpc_peers = vec!["192.168.1.20:50052".to_string()];
-        let local_only = llm_args(&cfg, std::path::Path::new("m.gguf"), &[]);
+        let loopback = IpAddr::from([127, 0, 0, 1]);
+        let local_only = llm_args(&cfg, std::path::Path::new("m.gguf"), &[], loopback);
         assert!(!local_only.iter().any(|a| a == "--rpc"));
-        let args = llm_args(&cfg, std::path::Path::new("m.gguf"), &cfg.llm.rpc_peers);
+        let args = llm_args(
+            &cfg,
+            std::path::Path::new("m.gguf"),
+            &cfg.llm.rpc_peers,
+            loopback,
+        );
+        // La clave nunca viaja como argumento.
+        assert!(!args.iter().any(|a| a.contains("api-key")));
         assert_eq!(args[..2], ["-m", "m.gguf"]);
         assert!(args.windows(2).any(|w| w == ["--host", "127.0.0.1"]));
         assert!(

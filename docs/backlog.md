@@ -43,7 +43,7 @@ Estado: ☐ pendiente · ◐ en curso · ☑ hecho
 | P.7 | Descubrimiento automático de equipos por mDNS ([ADR 0006](adr/0006-descubrimiento-mdns.md)) | Dos instancias se ven en ambos sentidos; una caída sin aviso se detecta en ~10 s | ☑ en un solo equipo; ☐ entre dos equipos físicos |
 | P.8 | Mapa del clúster en el panel, actividad y avisos | Estados y latencia visibles; aviso al conectarse o desconectarse un equipo | ☑ (notificaciones de Windows sin confirmar a la vista) |
 | P.9 | «Usar su GPU»: repartir un modelo con un equipo descubierto | `llama-server` responde con `--rpc` hacia otra instancia | ◐ validado en loopback sobre la misma GPU; ☐ con dos GPU reales |
-| P.10 | Usar el chat de un equipo desde otro (compartir en la LAN con clave) | — | ☐ |
+| P.10 | Usar el chat de un equipo desde otro (compartir en la LAN con clave) | Sin clave 401; con clave responde; el otro equipo ve el chat anunciado | ☑ por la IP de red de este equipo y en el navegador; ☐ entre dos equipos físicos |
 | P.6 | Arranque automático con Windows (opcional) | — | ☐ |
 
 ## Fase 1 — Clúster de jobs

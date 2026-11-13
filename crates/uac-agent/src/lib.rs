@@ -113,6 +113,7 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
         hostname,
         discovery: Discovery::default(),
         llm_model: RwLock::new(None),
+        llm_share: RwLock::new(None),
         llm_split: std::sync::atomic::AtomicBool::new(false),
         config: RwLock::new(cfg),
         config_path,

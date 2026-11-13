@@ -35,6 +35,7 @@ Desde el panel se puede:
 - **Ejecutar un modelo.** Eliges un GGUF local (carpetas configuradas o biblioteca de Ollama) y el panel dice si cabe en esta GPU, si habrá que repartirlo o si no cabe. Al iniciarlo aparece un chat; su API es compatible con OpenAI en `http://127.0.0.1:8080/v1`.
 - **Compartir mi GPU.** Deja que otro equipo de la red la use. Se elige por qué conexión: cable o Wi-Fi.
 - **Usar la GPU de otro equipo.** Botón «Usar su GPU» en su nodo del mapa. Un modelo solo se reparte cuando no cabe en esta GPU, y solo con los equipos que responden en ese momento.
+- **Compartir el chat con otros equipos.** Casilla «Permitir que otros equipos de mi red usen este chat»: el modelo se abre por la conexión que elijas y se protege con una clave aleatoria que ves en el panel. En el otro equipo, el nodo de este aparece con «Abrir su chat»; pide la clave una vez y la recuerda.
 - **Añadir un equipo por su IP**, para uno que solo tenga el servidor RPC de llama.cpp.
 - **Cambiar la configuración**, que se guarda en `%APPDATA%\uac\config.json`.
 
@@ -50,7 +51,7 @@ Si no se ven, lo primero que hay que mirar es el firewall: Windows trata un cabl
 
 ### Seguridad
 
-El panel y el chat solo escuchan en `127.0.0.1`: **el chat todavía no se puede abrir desde otro equipo**. Compartir la GPU no tiene contraseña: mientras esté activo, cualquiera en esa red puede usarla. Solo se aceptan direcciones de red local. Los errores quedan en `%APPDATA%\uac\uac-node.log`.
+El panel solo escucha en `127.0.0.1`. El chat también, salvo que marques compartirlo: entonces escucha en la IP de red elegida y exige la clave en cada petición (sin clave o con una incorrecta responde 401). La clave no viaja en el anuncio de la red: se la das tú a quien quieras. Quien la tenga puede usar el modelo y tu GPU mientras esté en marcha; «Generar clave nueva» la invalida. Compartir la GPU por RPC, en cambio, no tiene contraseña: mientras esté activo, cualquiera en esa red puede usarla. Solo se aceptan direcciones de red local. Los errores quedan en `%APPDATA%\uac\uac-node.log`.
 
 Para ver la salida en una consola mientras se desarrolla, usa el build de depuración: `cargo run -p uac-agent --bin uac-node`. Para probar dos nodos en un mismo equipo, arranca el segundo con la variable `UAC_CONFIG_DIR` apuntando a otra carpeta (con otro `panel_port` en su `config.json`) y con `UAC_ADVERTISE_LOOPBACK=1`.
 
@@ -74,7 +75,7 @@ cargo run -p uac-controller -- plan --required-gb 12
 
 Los informes de `probe` se quedan en local (están en `.gitignore`): contienen el nombre del equipo y rutas del usuario.
 
-Todavía no hay colas ni jobs, ni se puede usar el chat desde otro equipo: eso empieza en la Fase 1.
+Todavía no hay colas ni jobs: empiezan en la Fase 1.
 
 ## Estructura
 

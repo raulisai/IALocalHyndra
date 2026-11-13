@@ -10,6 +10,7 @@ publish.workspace = true
 anyhow.workspace = true
 axum = "0.8.9"
 clap.workspace = true
+getrandom = "0.4.3"
 if-addrs = "0.15.0"
 mdns-sd = "0.21.7"
 serde = { workspace = true, features = ["derive"] }

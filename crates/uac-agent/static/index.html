@@ -132,6 +132,9 @@ td { padding: 4px 6px; border-bottom: 1px solid var(--line); } td.num { text-ali
       <p class="lead">Elige un modelo y pulsa Iniciar. Si no cabe en esta GPU, se reparte entre los equipos que estés usando.</p>
       <select id="model"></select>
       <div id="fit"></div>
+      <label style="margin:12px 0 0;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="share" style="width:auto;margin-top:5px"><span style="color:var(--text);font-size:15px;margin:0">Permitir que otros equipos de mi red usen este chat<br><small class="muted">Se protege con una clave. Solo funciona mientras el modelo esté en marcha.</small></span></label>
+      <div id="share-opts" hidden><label style="margin-top:8px"><span>Por dónde compartir</span><select id="chat-bind"></select></label></div>
+      <div id="share-info"></div>
       <div class="row" style="margin-top:10px">
         <button class="primary" id="llm-start">Iniciar</button>
         <button id="llm-stop">Detener</button>
@@ -244,10 +247,16 @@ function peerState(p, s) {
   if (p.rpc) return { cls: "avail", link: "avail", label: "GPU disponible" };
   return { cls: "idle", link: "idle", label: "conectado" };
 }
-function peerAction(p) {
-  if (p.in_use) return `<button class="small" data-act="unuse" data-addr="${esc(p.rpc)}">Dejar de usar</button>`;
-  if (p.online && p.rpc) return `<button class="small primary" data-act="use" data-addr="${esc(p.rpc)}">Usar su GPU</button>`;
-  return "";
+function peerAction(p, full) {
+  let html = "";
+  if (p.in_use) html += `<button class="small" data-act="unuse" data-addr="${esc(p.rpc)}">Dejar de usar</button>`;
+  else if (p.online && p.rpc) html += `<button class="small primary" data-act="use" data-addr="${esc(p.rpc)}">Usar su GPU</button>`;
+  if (p.online && p.chat) {
+    const d = `data-url="http://${esc(p.chat)}/" data-id="${esc(p.id)}" data-name="${esc(p.name)}"`;
+    html += ` <button class="small primary" data-act="chat" ${d}>Abrir su chat</button>`;
+    if (full) html += ` <button class="small" data-act="chatkey" ${d}>Clave…</button>`;
+  }
+  return html;
 }
 
 function layout(n) {
@@ -299,10 +308,10 @@ function renderPeers(s) {
   $("peers").innerHTML = s.peers.length ? s.peers.map((p) => {
     const st = peerState(p, s);
     const meta = [p.gpu && `${esc(p.gpu)} · ${gib(p.vram_bytes)} (${gib(p.usable_bytes)} utilizables)`, p.backend, p.addr && `IP ${esc(p.addr)}`,
-      p.rpc_latency_ms != null && `${p.rpc_latency_ms} ms`, p.model && `ejecuta ${esc(p.model)}`, p.os, p.version && `v${esc(p.version)}`,
+      p.rpc_latency_ms != null && `${p.rpc_latency_ms} ms`, p.chat && "ofrece su chat", p.model && `ejecuta ${esc(p.model)}`, p.os, p.version && `v${esc(p.version)}`,
       p.source === "manual" && "añadido a mano", !p.online && p.seen_secs_ago != null && `visto hace ${ago(p.seen_secs_ago)}`].filter(Boolean).join(" · ");
     return `<div class="peer" id="peer-${esc(p.id)}"><div class="peer-main"><strong>${esc(p.name)}</strong> <span class="pill ${st.cls}">${st.label}</span>
-      <div class="peer-meta">${meta}</div></div>${peerAction(p)}</div>`;
+      <div class="peer-meta">${meta}</div></div><div class="row" style="gap:6px">${peerAction(p, true)}</div></div>`;
   }).join("") : `<p class="muted" style="margin:6px 0">Todavía no hay otros equipos.</p>`;
 }
 
@@ -342,7 +351,18 @@ function renderProcs(s) {
   $("llm-state").textContent = llm.running ? `en marcha · ${ago(llm.uptime_secs)}` : llm.last_exit ? "detenido" : "detenido";
   $("llm-state").className = "pill " + (llm.running ? "on" : "");
   $("llm-start").disabled = llm.running || !hasLlama; $("llm-stop").disabled = !llm.running;
-  $("chat-link").hidden = !llm.running; $("chat-link").href = `http://127.0.0.1:${s.config.llm.port}/`;
+  $("share").disabled = llm.running; $("chat-bind").disabled = llm.running;
+  if (llm.running) $("share").checked = !!s.self.chat;
+  $("share-opts").hidden = !$("share").checked;
+  when("share-info", [s.self.chat, s.config.llm.api_key, llm.running], () => {
+    const c = s.self.chat, key = s.config.llm.api_key;
+    $("share-info").innerHTML = c ? `<div class="note ok"><strong>Chat abierto a tu red</strong> en <code>http://${esc(c)}/</code><br>Clave de acceso: <code id="key-text">${esc(key)}</code>
+      <div class="row" style="margin-top:6px"><button class="small" data-copy="key">Copiar clave</button><button class="small" data-act="newkey">Generar clave nueva</button></div>
+      <small>En el otro equipo pulsa «Abrir su chat» y pega esta clave. Para abrir el chat aquí también necesitas la clave: pégala en Ajustes del chat.</small></div>`
+      : $("share").checked && !llm.running ? `<p class="note warn">Cualquiera en tu red que tenga la clave podrá usar este modelo y tu GPU. La primera vez, Windows preguntará si permites llama-server en la red: acepta solo para redes privadas.</p>`
+      : key && !llm.running ? `<p class="note">Hay una clave guardada de la última vez. <button class="small" data-act="newkey">Generar clave nueva</button></p>` : "";
+  });
+  $("chat-link").hidden = !llm.running; $("chat-link").href = `http://${s.self.chat || "127.0.0.1:" + s.config.llm.port}/`;
   $("rpc-state").textContent = rpc.running ? (s.self.sharing ? `compartida en ${s.self.sharing}` : "en marcha solo en este equipo") : "no compartida";
   $("rpc-state").className = "pill " + (rpc.running ? (s.self.sharing ? "on" : "warn") : "");
   $("rpc-start").disabled = rpc.running || !hasLlama; $("rpc-stop").disabled = !rpc.running; $("bind").disabled = rpc.running;
@@ -363,6 +383,9 @@ function renderBind(s) {
   $("bind").innerHTML = [...s.addresses].sort((a, b) => wifi(a.name) - wifi(b.name)).map((a) => `<option value="${a.ip}">${esc(a.name)}${wifi(a.name) ? " (más lento)" : " (cable)"} — ${a.ip}</option>`).join("")
     + `<option value="127.0.0.1">Solo este equipo (para pruebas)</option>`;
   const cur = s.config.rpc.bind;
+  const cb = $("chat-bind"), prevChat = cb.value;
+  cb.innerHTML = [...s.addresses].sort((a, b) => wifi(a.name) - wifi(b.name)).map((a) => `<option value="${a.ip}">${esc(a.name)}${wifi(a.name) ? " (más lento)" : " (cable)"} — ${a.ip}</option>`).join("") || '<option value="">Sin conexión de red</option>';
+  if (prevChat && [...cb.options].some((o) => o.value === prevChat)) cb.value = prevChat;
   $("bind").value = [...$("bind").options].some((o) => o.value === cur) && cur !== "127.0.0.1" ? cur : ($("bind").options[0]?.value ?? "127.0.0.1");
 }
 
@@ -423,7 +446,26 @@ async function act(btn, fn) {
 }
 
 document.addEventListener("click", (e) => {
+  const cp = e.target.closest("[data-copy]");
+  if (cp) { navigator.clipboard?.writeText(last.config.llm.api_key).then(() => toast("Clave copiada"), () => toast("No se pudo copiar; selecciónala y copia a mano")); return; }
   const b = e.target.closest("[data-act]");
+  if (b && b.dataset.act === "newkey") {
+    if (!confirm("Quien tenga la clave actual dejará de poder usar el chat. ¿Generar una nueva?")) return;
+    return act(b, async () => { const r = await api("POST", "/api/llm/rotate-key"); toast(r.restart_needed ? "Clave nueva. Detén y vuelve a iniciar el modelo para aplicarla." : "Clave nueva generada."); });
+  }
+  if (b && (b.dataset.act === "chat" || b.dataset.act === "chatkey")) {
+    const k = "uac-key:" + b.dataset.id;
+    let key = ""; try { key = localStorage.getItem(k) || ""; } catch {}
+    if (!key || b.dataset.act === "chatkey") {
+      key = (prompt(`Clave del chat de ${b.dataset.name} (se ve en su panel, en «Chat abierto a tu red»):`, key) || "").trim();
+      if (!key) return;
+      try { localStorage.setItem(k, key); } catch {}
+    }
+    navigator.clipboard?.writeText(key).catch(() => {});
+    window.open(b.dataset.url, "_blank", "noopener");
+    toast("Se abre su chat. La clave está copiada: pégala en Ajustes del chat.", 8000);
+    return;
+  }
   if (b) return act(b, async () => {
     await api("POST", `/api/peers/${b.dataset.act}`, { addr: b.dataset.addr });
     toast(b.dataset.act === "use" ? "Su GPU se usará la próxima vez que inicies un modelo que no quepa aquí." : "Ya no se usará su GPU.");
@@ -437,11 +479,17 @@ document.addEventListener("click", (e) => {
 });
 $("scan").onclick = (e) => act(null, async () => { await api("POST", "/api/scan"); toast("Buscando equipos en la red…", 2500); });
 $("model").onchange = renderFit;
+$("share").onchange = () => { $("share-opts").hidden = !$("share").checked; sigs["share-info"] = null; renderProcs(last); };
 $("llm-start").onclick = (e) => act(e.target, async () => {
   const m = models.find((x) => x.path === $("model").value);
   if (!m) throw new Error("Elige un modelo");
   if (m.fit === "too_big" && !confirm("Este modelo no cabe en la memoria de GPU disponible. Irá muy lento o fallará al cargar. ¿Iniciarlo de todos modos?")) return;
-  const r = await api("POST", "/api/llm/start", { model_path: m.path });
+  const share = $("share").checked, bind = $("chat-bind").value;
+  if (share) {
+    if (!bind) throw new Error("No hay una conexión de red por la que compartir");
+    if (!confirm(`Vas a abrir el chat a tu red en ${bind}. Quien tenga la clave podrá usar el modelo y tu GPU mientras esté en marcha. ¿Continuar?`)) return;
+  }
+  const r = await api("POST", "/api/llm/start", share ? { model_path: m.path, share_bind: bind, allow_lan: true } : { model_path: m.path });
   toast(r.split ? "Cargando el modelo repartido entre equipos… puede tardar." : "Cargando el modelo… el chat estará listo en unos segundos.", 6000);
   if (r.peers_skipped) toast(`${r.peers_skipped} equipo(s) en uso no responden y se dejaron fuera.`, 7000);
 });
