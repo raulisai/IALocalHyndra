@@ -177,9 +177,7 @@ pub fn run_node(opts: Options) -> anyhow::Result<()> {
                     1 => "1 equipo conectado".to_string(),
                     n => format!("{n} equipos conectados"),
                 };
-                format!(
-                    "Universal AI Cluster: activo\n{peers}\n{url}"
-                )
+                format!("Universal AI Cluster: activo\n{peers}\n{url}")
             }
         };
         tray::run(url, tooltip, move || {
