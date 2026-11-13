@@ -20,6 +20,8 @@ const MAX_EVENTS: usize = 50;
 const MAX_FIELD_CHARS: usize = 120;
 const PROBE_EVERY: Duration = Duration::from_secs(10);
 const VERIFY_EVERY: Duration = Duration::from_secs(15);
+/// Cuánto sigue un equipo desconectado en la lista antes de retirarse.
+const OFFLINE_KEEP: Duration = Duration::from_secs(30);
 const PROBE_TIMEOUT: Duration = Duration::from_millis(400);
 const SCAN_SHOWN_FOR: Duration = Duration::from_secs(4);
 
@@ -47,10 +49,13 @@ pub struct Advert {
 /// Dirección anunciada por otro equipo. Es un dato no confiable: solo se
 /// acepta si es de red local, para que un anuncio falso no nos haga conectar
 /// o abrir una dirección de Internet.
+///
+/// Una dirección de loopback anunciada por otro equipo tampoco sirve: para
+/// quien la lee apunta a su propio equipo, no al que la anuncia.
 fn lan_addr(value: Option<String>) -> Option<SocketAddr> {
     value
         .and_then(|v| v.parse::<SocketAddr>().ok())
-        .filter(|a| crate::config::is_lan_ip(a.ip()))
+        .filter(|a| crate::config::is_lan_ip(a.ip()) && !a.ip().is_loopback())
 }
 
 fn clip(text: &str) -> String {
@@ -263,6 +268,8 @@ struct PeerState {
     addr: Option<IpAddr>,
     online: bool,
     last_seen: Instant,
+    /// Desde cuándo está desconectado; `None` mientras está en línea.
+    offline_since: Option<Instant>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -427,6 +434,7 @@ fn apply_resolved(
             peer.fullname = name;
             peer.addr = addr.or(peer.addr);
             peer.online = true;
+            peer.offline_since = None;
             peer.last_seen = Instant::now();
         }
         None => {
@@ -439,11 +447,21 @@ fn apply_resolved(
                     addr,
                     online: true,
                     last_seen: Instant::now(),
+                    offline_since: None,
                 },
             );
         }
     }
     changes
+}
+
+/// Retira de la lista a los equipos que llevan desconectados más de
+/// [`OFFLINE_KEEP`], para que no se acumulen fantasmas.
+fn prune_offline(inner: &mut Inner, now: Instant) {
+    inner.peers.retain(|_, p| {
+        p.offline_since
+            .is_none_or(|since| now.saturating_duration_since(since) < OFFLINE_KEEP)
+    });
 }
 
 fn handle_event(disc: &Discovery, event: ServiceEvent, own_id: &str, notify: bool) {
@@ -496,6 +514,7 @@ fn handle_event(disc: &Discovery, event: ServiceEvent, own_id: &str, notify: boo
                         .values_mut()
                         .find(|p| p.fullname == name && p.online)?;
                     peer.online = false;
+                    peer.offline_since = Some(Instant::now());
                     let label = peer.advert.label();
                     push_event(inner, "left", format!("{label} se desconectó"));
                     Some(label)
@@ -580,6 +599,8 @@ pub fn run(disc: &Discovery, ctx: impl Fn() -> Context) {
                 inner.probes.extend(results);
             });
         }
+
+        disc.with(|inner| prune_offline(inner, Instant::now()));
 
         // mDNS tarda mucho en dar por perdido a un equipo que se apagó sin
         // despedirse: se le pregunta de forma activa.
@@ -687,6 +708,15 @@ mod tests {
         })
         .unwrap();
         assert_eq!((public.rpc, public.chat), (None, None));
+        // Un loopback anunciado por otro equipo apunta a nosotros, no a él.
+        let looped = Advert::from_txt(|k| match k {
+            "proto" => Some("1".to_string()),
+            "id" => Some("x".to_string()),
+            "rpc" | "chat" => Some("127.0.0.1:50053".to_string()),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!((looped.rpc, looped.chat), (None, None));
         assert_eq!(odd.name.chars().count(), MAX_FIELD_CHARS);
     }
 
@@ -783,7 +813,22 @@ mod tests {
         assert_eq!(apply(&mut inner, &quiet), []);
         assert_eq!(apply(&mut inner, &sample()), [Change::RpcUp]);
         assert_eq!(apply(&mut inner, &quiet), [Change::RpcDown]);
-        inner.peers.get_mut(&quiet.id).unwrap().online = false;
+        let gone = inner.peers.get_mut(&quiet.id).unwrap();
+        gone.online = false;
+        gone.offline_since = Some(Instant::now());
+        // Todavía no pasó el plazo: sigue en la lista.
+        prune_offline(&mut inner, Instant::now());
+        assert_eq!(inner.peers.len(), 1);
+        // Pasado el plazo, desaparece.
+        prune_offline(
+            &mut inner,
+            Instant::now() + OFFLINE_KEEP + Duration::from_secs(1),
+        );
+        assert!(inner.peers.is_empty());
+        apply(&mut inner, &quiet);
+        let gone = inner.peers.get_mut(&quiet.id).unwrap();
+        gone.online = false;
+        gone.offline_since = Some(Instant::now());
         // Al volver compartiendo GPU es una sola novedad: se conectó.
         assert_eq!(apply(&mut inner, &sample()), [Change::Joined]);
     }
