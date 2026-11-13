@@ -1,4 +1,4 @@
-# Backlog de desarrollo
+﻿# Backlog de desarrollo
 
 Tareas ordenadas por fase. Cada una tiene un criterio de aceptación comprobable. Contexto y motivos en [arquitectura-v2.md](arquitectura-v2.md).
 
@@ -11,7 +11,7 @@ Estado: ☐ pendiente · ◐ en curso · ☑ hecho
 | ID | Tarea | Nodo | Depende | Aceptación | Estado |
 |---|---|---|---|---|---|
 | T0.1 | Probe de hardware en Rust (`uac-agent probe`) | AMD | — | JSON con SO, CPU, RAM, GPU, VRAM real, NIC y herramientas | ☑ |
-| T0.2 | Ejecutar el probe en MAC y RTX y guardar el JSON en `docs/hardware/` | MAC, RTX | T0.1 | Tres JSON versionados; corregir el probe si macOS/Linux fallan (rutas sin probar) | ☐ |
+| T0.2 | Ejecutar el probe en MAC y RTX y guardar el JSON en `docs/hardware/` | MAC, RTX | T0.1 | Tres JSON versionados; corregir el probe si macOS/Linux fallan (rutas sin probar) | ◐ RTX hecho (Windows); falta MAC |
 | T0.3 | Cablear Ethernet en AMD y registrar la velocidad de enlace de cada nodo | todos | — | Ningún nodo depende de Wi-Fi para datos | ☐ |
 | T0.4 | `iperf3` entre cada par de nodos, en ambos sentidos | todos | T0.3 | Tabla de ancho de banda y latencia por par en `docs/hardware-matrix.md` | ☐ |
 | T0.5 | Decidir SO del nodo RTX (Windows nativo, WSL2 o Linux) | RTX | T0.2 | ADR con la decisión | ☐ |
@@ -23,8 +23,8 @@ Estado: ☐ pendiente · ◐ en curso · ☑ hecho
 
 | ID | Tarea | Nodo | Depende | Aceptación | Estado |
 |---|---|---|---|---|---|
-| T0.7 | Instalar llama.cpp en el **mismo build** (`b12110`, binarios oficiales, ver [llama-cpp.md](llama-cpp.md)): Vulkan (AMD), CUDA (RTX), Metal (MAC) | todos | — | `llama-bench` corre en cada nodo con el mismo GGUF; tok/s en [benchmarks/llama-bench.md](benchmarks/llama-bench.md) | ◐ AMD hecho; faltan RTX y MAC |
-| T0.8 | Probar `ggml-rpc-server` Vulkan con anfitrión Metal y con anfitrión CUDA | AMD + 1 | T0.7, regla de firewall | Genera texto correcto, o queda documentado el fallo | ◐ validado en loopback (salida idéntica a la local); falta entre máquinas |
+| T0.7 | Instalar llama.cpp en el **mismo build** (`b12110`, binarios oficiales, ver [llama-cpp.md](llama-cpp.md)): Vulkan (AMD), CUDA (RTX), Metal (MAC) | todos | — | `llama-bench` corre en cada nodo con el mismo GGUF; tok/s en [benchmarks/llama-bench.md](benchmarks/llama-bench.md) | ◐ AMD hecho; RTX hecho con 3B (falta 7B por disco); falta MAC |
+| T0.8 | Probar `ggml-rpc-server` Vulkan con anfitrión Metal y con anfitrión CUDA | AMD + 1 | T0.7, regla de firewall | Genera texto correcto, o queda documentado el fallo | ◐ validado en loopback (salida idéntica a la local); falta entre máquinas: el nodo AMD ya es descubierto pero aún no comparte su RPC |
 | T0.9 | Servir un GGUF que no cabe en 8 GB (hay uno de 15,66 GB en el nodo AMD): 2 nodos y 3 nodos | todos | T0.4, T0.8 | tok/s, TTFT, VRAM por nodo y bytes por token (`GGML_RPC_DEBUG=3`) | ☐ |
 | T0.10 | Baseline de comparación: el mismo modelo con cuantizado menor en un solo nodo, y en el Mac solo | RTX, MAC | T0.7 | Tabla comparativa | ☐ |
 | T0.11 | ADR de viabilidad aplicando el criterio de abandono | — | T0.9, T0.10 | Decisión escrita: reparto por defecto, opcional o descartado | ☐ |
@@ -114,3 +114,4 @@ Estado: ☐ pendiente · ◐ en curso · ☑ hecho
 1. T0.2 y T0.3: son físicas y desbloquean todo lo demás.
 2. T0.7–T0.11 en paralelo con T1.1–T1.2: el baseline no necesita el control plane.
 3. T3.1 puede empezar en cuanto exista Gate 0; es independiente de la Fase 1.
+

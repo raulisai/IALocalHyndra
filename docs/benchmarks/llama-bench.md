@@ -29,9 +29,22 @@ Windows 11, driver propietario AMD 32.0.21045.5002, Vulkan 1.4.315. llama.cpp ve
 - El `pp512` de la fila `-ngl 0` no es una cifra de CPU pura: es demasiado alto para este procesador, así que llama.cpp probablemente siguió usando la GPU para el lote del prompt. La cifra de CPU fiable es `tg128`.
 - Wi-Fi no intervino en ninguna medición.
 
-## Nodo RTX — RTX 3070, CUDA
+## Nodo RTX — RTX 3070 Laptop, CUDA (2026-11-13)
 
-Pendiente (T0.7).
+Portátil con i7-11800H. Windows 11, driver NVIDIA 617.14, binarios `win-cuda-12.4` del build `b12110` (hash comprobado). llama.cpp ve `CUDA0: NVIDIA GeForce RTX 3070 Laptop GPU (8191 MiB, 7128 MiB free)`, compute capability 8.6. Mismo GGUF que el nodo AMD (SHA-256 comprobado).
+
+| Modelo | Modo | pp512 | tg128 |
+|---|---|---:|---:|
+| qwen2.5 3B Q4_K_M | CUDA directo | 5339,85 ± 457,87 | 138,39 ± 0,47 |
+
+Prueba del prototipo (P.3): `uac-node` arrancó `llama-server` con este modelo y `/v1/chat/completions` respondió a 111 tok/s, con 2,4 GiB de VRAM ocupada.
+
+### Notas
+
+- Es la versión **Laptop** de la 3070: su límite de potencia es menor que el de la de escritorio, así que las cifras no valen para una 3070 de escritorio.
+- La desviación de `pp512` es alta (±9 %); probablemente por la gestión de energía del portátil. Conviene repetir enchufado y en modo de máximo rendimiento.
+- Frente a la RX 6600 con el mismo modelo: generación ×1,6 (138 frente a 86 tok/s), prompt ×5,2.
+- Falta el 7B: no se descargó por falta de espacio en disco (ver [hardware-matrix.md](../hardware-matrix.md)).
 
 ## Nodo MAC — M4, Metal
 
